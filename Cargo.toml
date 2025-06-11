@@ -12,3 +12,14 @@ tower-http = { version = "0.5", features = ["fs", "cors"] }
 mime_guess = "2.0"
 tokio-util = { version = "0.7", features = ["io"] }
 futures-util = "0.3"
+
+# Safer release profile for macOS app bundles
+# Avoids aggressive optimizations that can cause crashes with WebView/FFI
+[profile.release]
+opt-level = 3          # Standard optimization (not "z" which can break FFI)
+lto = "thin"           # Thin LTO instead of full LTO (safer with dynamic libraries)
+codegen-units = 16     # Allow more units for better compatibility
+panic = "unwind"       # Keep unwind for better error handling in GUI apps
+strip = false          # Don't strip symbols (can cause issues with debugging)
+debug = false          # No debug info in release
+overflow-checks = false # Standard release setting
