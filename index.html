@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP Server Test Page</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+            color: #333;
+            line-height: 1.6;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            border: 1px solid #e9ecef;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+        }
+        .status {
+            background: #d1edff;
+            border: 2px solid #0066cc;
+            color: #003d7a;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: bold;
+            text-align: center;
+        }
+        .feature-list {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #28a745;
+        }
+        .feature-list h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .feature-list ul {
+            margin: 0;
+            padding-left: 20px;
+            color: #495057;
+        }
+        .feature-list li {
+            margin: 10px 0;
+        }
+        .test-links {
+            background: #fff9c4;
+            border: 2px solid #ffc107;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .test-links p {
+            color: #856404;
+            font-weight: bold;
+            margin-bottom: 15px;
+        }
+        .test-links a {
+            display: inline-block;
+            margin: 8px 12px 8px 0;
+            padding: 10px 18px;
+            background: linear-gradient(45deg, #007bff, #0056b3);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-links a:hover {
+            background: linear-gradient(45deg, #0056b3, #004085);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            color: #6c757d;
+            font-size: 0.95em;
+            border-top: 1px solid #e9ecef;
+            padding-top: 20px;
+        }
+        pre {
+            background: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-radius: 4px;
+            padding: 15px;
+            overflow-x: auto;
+            color: #495057;
+        }
+        code {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>HTTP Server is Running!</h1>
+        
+        <div class="status">
+            HTTP server is working correctly!
+        </div>
+
+        <div class="feature-list">
+            <h3>Features:</h3>
+            <ul>
+                <li><strong>Cross-platform</strong> - Works on Mac, Linux, Windows</li>
+                <li><strong>Static file serving</strong> - Serves files with correct MIME types</li>
+                <li><strong>CORS enabled</strong> - All requests allowed</li>
+                <li><strong>SPA support</strong> - Single Page Application fallback</li>
+                <li><strong>Security protection</strong> - Against directory traversal</li>
+                <li><strong>Configurable</strong> - Custom directory and port options</li>
+            </ul>
+        </div>
+
+        <h3>🧪 Test the server:</h3>
+        <div class="test-links">
+            <p><strong>Test different file types and MIME detection:</strong></p>
+            <a href="/test.css">CSS File</a>
+            <a href="/test.js">JavaScript File</a>
+            <a href="/test.json">JSON File</a>
+            <a href="/README.md">Markdown File</a>
+            <a href="/Cargo.toml">TOML File</a>
+            <a href="/test.svg">SVG Image</a>
+            <a href="/nonexistent.html">Non-existent File</a>
+        </div>
+
+        <h3>💻 Command Line Usage:</h3>
+        <div class="feature-list">
+            <pre><code># Default settings (current directory, port 8080)
+# Using the binary
+./httpserver --help</code></pre>
+        </div>
+
+        <div class="footer">
+            <p>Status: online</p>
+        </div>
+    </div>
+
+    <script src="/test.js"></script>
+    <script>
+        // Simple JavaScript to demonstrate JS file serving
+        console.log('HTTP Server test page loaded successfully!');
+        
+        // Add current time to the page
+        const now = new Date().toLocaleString();
+        const timeElement = document.createElement('p');
+        timeElement.textContent = `Page loaded at: ${now}`;
+        timeElement.style.textAlign = 'center';
+        timeElement.style.color = '#666';
+        timeElement.style.fontStyle = 'italic';
+        document.querySelector('.footer').appendChild(timeElement);
+    </script>
+</body>
+</html>
