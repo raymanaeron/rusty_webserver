@@ -1,13 +1,15 @@
 use axum::{
-    extract::Path,
+    extract::{ConnectInfo, Path, Request},
     http::{header, StatusCode},
+    middleware::{self, Next},
     response::{IntoResponse, Response},
     routing::get,
     Router,
 };
+use chrono::Utc;
 use clap::Parser;
 use mime_guess::from_path;
-use std::path::PathBuf;
+use std::{net::SocketAddr, path::PathBuf};
 use tokio::fs;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
@@ -41,7 +43,7 @@ async fn main() {
     println!("Starting HTTP server on port {}", args.port);
     println!("Serving files from: {}", serve_dir.display());
 
-    // Create the router with CORS support
+    // Create the router with CORS support and logging middleware
     let serve_dir_clone = serve_dir.clone();
     let app = Router::new()
         .route("/", get({
@@ -51,6 +53,7 @@ async fn main() {
         .route("/*path", get(move |Path(path): Path<String>| serve_file(path, serve_dir_clone)))
         .layer(
             ServiceBuilder::new()
+                .layer(middleware::from_fn(logging_middleware))
                 .layer(CorsLayer::permissive()) // Allow all CORS requests
         );
 
@@ -65,10 +68,38 @@ async fn main() {
 
     println!("Server running at http://localhost:{}", args.port);
 
-    if let Err(e) = axum::serve(listener, app).await {
+    if let Err(e) = axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await {
         eprintln!("Server error: {}", e);
         std::process::exit(1);
     }
+}
+
+async fn logging_middleware(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    req: Request,
+    next: Next,
+) -> Response {
+    let method = req.method().clone();
+    let uri = req.uri().clone();
+    
+    // Call the next middleware/handler
+    let response = next.run(req).await;
+    
+    let status = response.status();
+    let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
+    
+    // Log in ngrok-style format: Timestamp | IP | Method URL | Status Code Status Text
+    println!(
+        "{} | {} | {} {} | {} {}",
+        timestamp,
+        addr.ip(),
+        method,
+        uri,
+        status.as_u16(),
+        status.canonical_reason().unwrap_or("Unknown")
+    );
+    
+    response
 }
 
 async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
