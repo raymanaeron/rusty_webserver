@@ -13,4 +13,4 @@ if exist "target" (
 )
 
 echo Cleanup completed!
-pause
+echo.

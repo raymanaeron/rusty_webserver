@@ -32,4 +32,4 @@ if %errorlevel% equ 0 (
 )
 
 echo Build completed!
-pause
+echo.
