@@ -1,0 +1,15 @@
+[package]
+name = "httpserver-core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+tokio = { workspace = true }
+chrono = { workspace = true }
+
+[lib]
+name = "httpserver_core"
+path = "src/lib.rs"

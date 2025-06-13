@@ -1,0 +1,17 @@
+[package]
+name = "httpserver"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "httpserver"
+path = "src/main.rs"
+
+[dependencies]
+httpserver-core = { path = "../httpserver-core" }
+httpserver-static = { path = "../httpserver-static" }
+httpserver-config = { path = "../httpserver-config" }
+
+# CLI dependencies
+clap = { workspace = true }
+tokio = { workspace = true }

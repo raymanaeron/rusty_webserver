@@ -1,0 +1,11 @@
+[package]
+name = "httpserver-balancer"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Dependencies will be added in Phase 3
+
+[lib]
+name = "httpserver_balancer"
+path = "src/lib.rs"

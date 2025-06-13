@@ -1,0 +1,14 @@
+[package]
+name = "httpserver-static"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+httpserver-core = { path = "../httpserver-core" }
+axum = { workspace = true }
+tokio = { workspace = true }
+mime_guess = { workspace = true }
+
+[lib]
+name = "httpserver_static"
+path = "src/lib.rs"

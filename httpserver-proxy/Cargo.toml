@@ -1,0 +1,11 @@
+[package]
+name = "httpserver-proxy"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Dependencies will be added in Phase 2
+
+[lib]
+name = "httpserver_proxy"
+path = "src/lib.rs"

@@ -1,18 +1,31 @@
-[package]
-name = "httpserver"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+    "httpserver",           # Main binary crate
+    "httpserver-core",      # Core server functionality
+    "httpserver-static",    # Static file serving
+    "httpserver-proxy",     # Reverse proxy (future)
+    "httpserver-balancer",  # Load balancing (future)
+    "httpserver-config",    # Configuration parsing
+]
 
-[dependencies]
-clap = { version = "4.4", features = ["derive"] }
+resolver = "2"
+
+# Shared dependencies for all workspace members
+[workspace.dependencies]
 tokio = { version = "1.0", features = ["full"] }
 axum = "0.7"
 tower = "0.4"
 tower-http = { version = "0.5", features = ["fs", "cors"] }
+serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+clap = { version = "4.4", features = ["derive"] }
 mime_guess = "2.0"
 tokio-util = { version = "0.7", features = ["io"] }
 futures-util = "0.3"
-chrono = { version = "0.4", features = ["serde"] }
+
+# Future dependencies for Phase 2+
+reqwest = { version = "0.11", features = ["json", "stream"] }
+toml = "0.8"
 
 # Safer release profile for macOS app bundles
 # Avoids aggressive optimizations that can cause crashes with WebView/FFI
