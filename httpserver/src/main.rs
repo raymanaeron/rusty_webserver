@@ -3,7 +3,15 @@ use httpserver_config::{Args, Config};
 use httpserver_core::Server;
 use httpserver_static::StaticHandler;
 use httpserver_proxy::ProxyHandler;
-use axum::Router;
+use axum::{
+    Router, 
+    extract::{Request, ConnectInfo},
+    response::{Response, IntoResponse},
+    middleware::{self, Next},
+    http::StatusCode,
+};
+use std::sync::Arc;
+use std::net::SocketAddr;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -36,18 +44,55 @@ async fn create_router(
     static_handler: StaticHandler,
 ) -> Result<Router, Box<dyn std::error::Error>> {
     // Start with the static file router
-    let app = static_handler.create_router();
+    let static_router = static_handler.create_router();
     
-    // If proxy routes are configured, add them with higher priority
+    // If proxy routes are configured, add proxy middleware with higher priority
     if proxy_handler.has_routes() {
-        // For Phase 2.1, we're just setting up the structure
-        // Actual HTTP forwarding will be implemented in Phase 2.2
         println!("Proxy routes configured: {}", proxy_handler.routes().len());
         for route in proxy_handler.routes() {
             println!("  {} -> {}", route.path, route.target);
         }
-        println!("Note: HTTP forwarding will be implemented in Phase 2.2");
+        
+        // Wrap proxy handler in Arc for sharing across requests
+        let proxy_handler = Arc::new(proxy_handler);
+        
+        // Create router with proxy middleware that runs before static file serving
+        let app = static_router
+            .layer(middleware::from_fn_with_state(
+                proxy_handler,
+                proxy_middleware
+            ));
+        
+        println!("Proxy forwarding active - routes will be processed before static files");
+        Ok(app)
+    } else {
+        // No proxy routes, just return static router
+        Ok(static_router)
     }
+}
+
+/// Middleware that handles proxy requests before they reach static file serving
+async fn proxy_middleware(
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
+    axum::extract::State(state): axum::extract::State<Arc<ProxyHandler>>,
+    req: Request,
+    next: Next,
+) -> Response {
+    // Check if this request matches any proxy routes
+    let path = req.uri().path().to_string();
     
-    Ok(app)
+    if let Some(_route_match) = state.find_route(&path) {
+        // This is a proxy request - handle it
+        match state.handle_request(req, addr).await {
+            Some(Ok(response)) => response,
+            Some(Err(proxy_error)) => proxy_error.into_response(),
+            None => {
+                // This shouldn't happen since we found a route, but handle gracefully
+                (StatusCode::INTERNAL_SERVER_ERROR, "Proxy routing error").into_response()
+            }
+        }
+    } else {
+        // No proxy route matched, continue to static file serving
+        next.run(req).await
+    }
 }

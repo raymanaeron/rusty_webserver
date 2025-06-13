@@ -1,4 +1,11 @@
 use httpserver_config::ProxyRoute;
+use axum::{
+    extract::Request,
+    response::{Response, IntoResponse},
+    http::{StatusCode, HeaderMap, HeaderName, HeaderValue},
+    body::Body,
+};
+use std::{net::SocketAddr, time::Duration};
 
 /// Route matching engine for reverse proxy
 pub struct RouteMatch {
@@ -152,15 +159,19 @@ impl RouteMatcher {
 pub struct ProxyHandler {
     /// Route matcher for finding proxy targets
     route_matcher: RouteMatcher,
+    /// HTTP forwarder for handling requests
+    forwarder: ProxyForwarder,
 }
 
 impl ProxyHandler {
     /// Create a new proxy handler with the given routes
     pub fn new(routes: Vec<ProxyRoute>) -> Self {
         let route_matcher = RouteMatcher::new(routes);
+        let forwarder = ProxyForwarder::new();
         
         Self {
             route_matcher,
+            forwarder,
         }
     }
     
@@ -177,6 +188,310 @@ impl ProxyHandler {
     /// Get all configured routes (for inspection)
     pub fn routes(&self) -> &[ProxyRoute] {
         self.route_matcher.routes()
+    }
+    
+    /// Handle a proxy request (find route and forward if matched)
+    pub async fn handle_request(
+        &self,
+        req: Request<Body>,
+        client_ip: SocketAddr,
+    ) -> Option<Result<Response<Body>, ProxyError>> {
+        // Extract path for route matching
+        let path = req.uri().path();
+        
+        // Find matching route
+        if let Some(route_match) = self.find_route(path) {
+            Some(self.forwarder.forward_request(req, &route_match, client_ip).await)
+        } else {
+            None
+        }
+    }
+}
+
+/// HTTP proxy forwarder that handles request forwarding to backend servers
+pub struct ProxyForwarder {
+    /// HTTP client for making requests to backend servers
+    client: reqwest::Client,
+}
+
+impl ProxyForwarder {
+    /// Create a new proxy forwarder
+    pub fn new() -> Self {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(30)) // Default timeout
+            .build()
+            .expect("Failed to create HTTP client");
+            
+        Self { client }
+    }
+    
+    /// Forward a request to the target server
+    pub    async fn forward_request(
+        &self,
+        req: Request<Body>,
+        route_match: &RouteMatch,
+        client_ip: SocketAddr,
+    ) -> Result<Response<Body>, ProxyError> {
+        let start_time = std::time::Instant::now();
+        
+        // Build the target URL
+        let target_url = self.build_target_url(&route_match.route.target, &route_match.stripped_path)?;
+        
+        // Extract request components before consuming the body
+        let method = req.method().clone();
+        let uri = req.uri().clone();
+        let headers = req.headers().clone();
+        let body_bytes = axum::body::to_bytes(req.into_body(), usize::MAX).await
+            .map_err(|e| ProxyError::RequestBody(e.to_string()))?;
+        
+        // Build the proxy request
+        let reqwest_method = match method.as_str() {
+            "GET" => reqwest::Method::GET,
+            "POST" => reqwest::Method::POST,
+            "PUT" => reqwest::Method::PUT,
+            "DELETE" => reqwest::Method::DELETE,
+            "HEAD" => reqwest::Method::HEAD,
+            "OPTIONS" => reqwest::Method::OPTIONS,
+            "PATCH" => reqwest::Method::PATCH,
+            _ => return Err(ProxyError::RequestFailed(format!("Unsupported method: {}", method))),
+        };
+        
+        let mut proxy_req = self.client
+            .request(reqwest_method, &target_url)
+            .timeout(Duration::from_secs(route_match.route.timeout));
+        
+        // Forward headers (with modifications)
+        let forwarded_headers = self.prepare_headers(&headers, &client_ip, &target_url)?;
+        for (name_str, value_str) in forwarded_headers {
+            if let (Ok(req_name), Ok(req_value)) = (
+                reqwest::header::HeaderName::from_bytes(name_str.as_bytes()),
+                reqwest::header::HeaderValue::from_bytes(value_str.as_bytes())
+            ) {
+                proxy_req = proxy_req.header(req_name, req_value);
+            }
+        }
+        
+        // Add body if present
+        if !body_bytes.is_empty() {
+            proxy_req = proxy_req.body(body_bytes.to_vec());
+        }
+        
+        // Execute the request
+        let proxy_response = proxy_req.send().await
+            .map_err(|e| {
+                if e.is_timeout() {
+                    ProxyError::Timeout(route_match.route.timeout)
+                } else if e.is_connect() {
+                    ProxyError::ConnectionFailed(target_url.clone())
+                } else {
+                    ProxyError::RequestFailed(e.to_string())
+                }
+            })?;
+        
+        // Convert response
+        let response = self.convert_response(proxy_response).await?;
+        
+        // Log the proxy request
+        let duration = start_time.elapsed();
+        println!("PROXY {} {} -> {} ({}ms)", 
+                method, 
+                uri, 
+                target_url, 
+                duration.as_millis());
+        
+        Ok(response)
+    }
+    
+    /// Build the target URL by combining target and stripped path
+    fn build_target_url(&self, target: &str, stripped_path: &str) -> Result<String, ProxyError> {
+        let target = target.trim_end_matches('/');
+        let path = if stripped_path.is_empty() {
+            String::new()
+        } else if stripped_path.starts_with('/') {
+            stripped_path.to_string()
+        } else {
+            format!("/{}", stripped_path)
+        };
+        
+        let url = format!("{}{}", target, path);
+        
+        // Validate URL
+        reqwest::Url::parse(&url)
+            .map_err(|e| ProxyError::InvalidUrl(format!("Invalid target URL '{}': {}", url, e)))?;
+        
+        Ok(url)
+    }
+    
+    /// Prepare headers for forwarding (add proxy headers, modify Host, etc.)
+    fn prepare_headers(
+        &self,
+        original_headers: &HeaderMap,
+        client_ip: &SocketAddr,
+        target_url: &str,
+    ) -> Result<Vec<(String, String)>, ProxyError> {
+        let mut headers = Vec::new();
+        
+        // Parse target URL to get host
+        let target_uri = reqwest::Url::parse(target_url)
+            .map_err(|e| ProxyError::InvalidUrl(format!("Invalid target URL: {}", e)))?;
+        
+        // Copy headers from original request, converting between types
+        for (name, value) in original_headers {
+            let name_str = name.as_str().to_lowercase();
+            
+            // Skip headers that we'll replace or shouldn't forward
+            match name_str.as_str() {
+                "host" | "connection" | "upgrade" | "proxy-connection" => continue,
+                "content-length" | "transfer-encoding" => continue, // Let reqwest handle these
+                _ => {
+                    if let Ok(value_str) = value.to_str() {
+                        headers.push((name.as_str().to_string(), value_str.to_string()));
+                    }
+                }
+            }
+        }
+        
+        // Set new Host header
+        if let Some(host) = target_uri.host_str() {
+            let host_value = if let Some(port) = target_uri.port() {
+                format!("{}:{}", host, port)
+            } else {
+                host.to_string()
+            };
+            headers.push(("host".to_string(), host_value));
+        }
+        
+        // Add X-Forwarded-For header
+        let x_forwarded_for = if let Some(existing) = original_headers.get("x-forwarded-for") {
+            if let Ok(existing_str) = existing.to_str() {
+                format!("{}, {}", existing_str, client_ip.ip())
+            } else {
+                client_ip.ip().to_string()
+            }
+        } else {
+            client_ip.ip().to_string()
+        };
+        headers.push(("x-forwarded-for".to_string(), x_forwarded_for));
+        
+        // Add X-Forwarded-Proto header
+        let proto = if target_url.starts_with("https://") { "https" } else { "http" };
+        headers.push(("x-forwarded-proto".to_string(), proto.to_string()));
+        
+        Ok(headers)
+    }
+    
+    /// Convert reqwest response to axum response
+    async fn convert_response(&self, proxy_response: reqwest::Response) -> Result<Response<Body>, ProxyError> {
+        let status = StatusCode::from_u16(proxy_response.status().as_u16())
+            .map_err(|e| ProxyError::ResponseError(format!("Invalid status code: {}", e)))?;
+        
+        let mut response = Response::builder().status(status);
+        
+        // Copy headers from reqwest response to axum response
+        let headers = response.headers_mut().unwrap();
+        for (name, value) in proxy_response.headers() {
+            // Skip headers that might cause issues
+            let name_str = name.as_str().to_lowercase();
+            match name_str.as_str() {
+                "connection" | "transfer-encoding" | "content-encoding" => continue,
+                _ => {
+                    if let (Ok(header_name), Ok(header_value)) = (
+                        HeaderName::from_bytes(name.as_str().as_bytes()),
+                        HeaderValue::from_bytes(value.as_bytes())
+                    ) {
+                        headers.insert(header_name, header_value);
+                    }
+                }
+            }
+        }
+        
+        // Get response body
+        let body_bytes = proxy_response.bytes().await
+            .map_err(|e| ProxyError::ResponseBody(e.to_string()))?;
+        
+        let response = response
+            .body(Body::from(body_bytes))
+            .map_err(|e| ProxyError::ResponseError(format!("Failed to build response: {}", e)))?;
+        
+        Ok(response)
+    }
+}
+
+/// Proxy error types
+#[derive(Debug)]
+pub enum ProxyError {
+    /// Request body reading failed
+    RequestBody(String),
+    /// Request failed
+    RequestFailed(String),
+    /// Connection to target failed
+    ConnectionFailed(String),
+    /// Request timeout
+    Timeout(u64),
+    /// Invalid URL
+    InvalidUrl(String),
+    /// Header processing error
+    HeaderError(String),
+    /// Response processing error
+    ResponseError(String),
+    /// Response body reading failed
+    ResponseBody(String),
+}
+
+impl std::fmt::Display for ProxyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProxyError::RequestBody(msg) => write!(f, "Request body error: {}", msg),
+            ProxyError::RequestFailed(msg) => write!(f, "Request failed: {}", msg),
+            ProxyError::ConnectionFailed(url) => write!(f, "Connection failed to: {}", url),
+            ProxyError::Timeout(seconds) => write!(f, "Request timeout after {} seconds", seconds),
+            ProxyError::InvalidUrl(msg) => write!(f, "Invalid URL: {}", msg),
+            ProxyError::HeaderError(msg) => write!(f, "Header error: {}", msg),
+            ProxyError::ResponseError(msg) => write!(f, "Response error: {}", msg),
+            ProxyError::ResponseBody(msg) => write!(f, "Response body error: {}", msg),
+        }
+    }
+}
+
+impl std::error::Error for ProxyError {}
+
+impl IntoResponse for ProxyError {
+    fn into_response(self) -> Response {
+        let (status, message) = match &self {
+            ProxyError::ConnectionFailed(_) => (StatusCode::BAD_GATEWAY, "Backend server unavailable"),
+            ProxyError::Timeout(_) => (StatusCode::GATEWAY_TIMEOUT, "Backend server timeout"),
+            ProxyError::InvalidUrl(_) => (StatusCode::INTERNAL_SERVER_ERROR, "Invalid backend configuration"),
+            _ => (StatusCode::INTERNAL_SERVER_ERROR, "Proxy error"),
+        };
+        
+        let error_response = format!(
+            r#"<!DOCTYPE html>
+<html>
+<head>
+    <title>{} - Proxy Error</title>
+    <style>
+        body {{ font-family: Arial, sans-serif; margin: 40px; }}
+        h1 {{ color: #d32f2f; }}
+        p {{ color: #666; }}
+        .error {{ background: #ffebee; padding: 20px; border-radius: 4px; }}
+    </style>
+</head>
+<body>
+    <div class="error">
+        <h1>{} {}</h1>
+        <p>{}</p>
+        <p><strong>Details:</strong> {}</p>
+    </div>
+</body>
+</html>"#,
+            status.as_u16(),
+            status.as_u16(),
+            status.canonical_reason().unwrap_or("Error"),
+            message,
+            self
+        );
+        
+        (status, error_response).into_response()
     }
 }
 
