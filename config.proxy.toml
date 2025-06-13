@@ -1,0 +1,20 @@
+# Test configuration for Phase 2.1 - Route Matching
+[static_config]
+directory = "."
+fallback = "index.html"
+
+# Test proxy routes for route matching engine
+[[proxy]]
+path = "/api/*"
+target = "http://localhost:3000"
+timeout = 30
+
+[[proxy]]
+path = "/admin/*"
+target = "http://localhost:8000" 
+timeout = 60
+
+[[proxy]]
+path = "/health"
+target = "http://localhost:3000"
+timeout = 5

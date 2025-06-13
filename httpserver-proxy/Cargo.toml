@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-# Dependencies will be added in Phase 2
+httpserver-config = { path = "../httpserver-config" }
 
 [lib]
 name = "httpserver_proxy"

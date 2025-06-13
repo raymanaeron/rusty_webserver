@@ -11,7 +11,9 @@ path = "src/main.rs"
 httpserver-core = { path = "../httpserver-core" }
 httpserver-static = { path = "../httpserver-static" }
 httpserver-config = { path = "../httpserver-config" }
+httpserver-proxy = { path = "../httpserver-proxy" }
 
 # CLI dependencies
 clap = { workspace = true }
 tokio = { workspace = true }
+axum = { workspace = true }

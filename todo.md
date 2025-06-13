@@ -8,12 +8,13 @@ Transform the current static HTTP server into a powerful application gateway tha
 - Health checks and failover
 - Modular architecture for maintainability ✅ **COMPLETED**
 
-## 🎯 Current Status: **Phase 1.2 Complete** ✅
+## 🎯 Current Status: **Phase 2.1 Complete** ✅
 **Last Updated**: June 13, 2025  
 **Domain**: httpserver.io (acquired ✅)  
 **Architecture**: Fully modularized Rust workspace  
 **All existing functionality preserved**: ✅ Static file serving works perfectly  
 **Configuration System**: ✅ TOML parsing and validation complete  
+**Route Matching Engine**: ✅ Path-based routing with wildcards implemented  
 
 ## 📋 Development Log & Session Context
 
@@ -64,10 +65,45 @@ rusty_webserver/
 - Confirmed CLI arguments override config file settings
 - Tested TOML parsing error messages are clear and helpful
 
+### ✅ **Phase 2.1 Complete (Current Session)**
+**What was done:**
+- Implemented comprehensive route matching engine for reverse proxy functionality
+- Created `RouteMatcher` with support for exact paths and wildcard patterns (`/api/*`)
+- Added priority system where proxy routes take precedence over static files
+- Implemented path manipulation with automatic path stripping for wildcard routes
+- Added support for global wildcard (`*`) and prefix matching (`/api/*`)
+- Created `RouteMatch` structure to return matched route info and stripped paths
+- Integrated proxy route detection into main server startup
+- Added comprehensive unit tests (8 tests, all passing) covering:
+  - Exact path matching (`/health`)
+  - Wildcard path matching (`/api/*`)
+  - Route priority (first match wins)
+  - Path normalization (handles with/without leading slash)
+  - Global wildcard matching (`*`)
+  - Pattern compilation logic
+  - Empty routes handling
+  - Full ProxyHandler integration
+
+**Route matching features implemented:**
+- ✅ Path-based routing (`/api/*`, `/admin/*`, `/health`)
+- ✅ Priority system (proxy routes processed before static files)
+- ✅ Path manipulation (automatic stripping for forwarding)
+- ✅ Wildcard support (`/*` and `*` patterns)
+- ✅ Exact match support for specific endpoints
+- ✅ Path normalization (leading slash handling)
+- ✅ Order-based precedence (first matching route wins)
+
+**Testing completed:**
+- ✅ All 8 unit tests pass covering edge cases and functionality
+- ✅ Configuration loading works with proxy routes
+- ✅ Static file serving preserved when no proxy routes configured
+- ✅ Route detection and logging working correctly
+
 **Next development session should focus on:**
-1. **Phase 2.1**: Implement basic reverse proxy route matching engine
-2. Start implementing HTTP proxy forwarding in `httpserver-proxy`
-3. Add proxy routes to Axum router with priority over static files
+1. **Phase 2.2**: Implement HTTP proxy forwarding functionality
+2. Add request forwarding to target servers using `reqwest`
+3. Implement response streaming back to clients
+4. Add proper header handling (Host, X-Forwarded-For, etc.)
 
 ## Phase 1: Architecture & Foundation
 
@@ -100,11 +136,11 @@ rusty_webserver/
 
 ## Phase 2: Basic Reverse Proxy
 
-### 2.1 Proxy Route Matching
-- [ ] **Route matching engine** - Implement path-based routing (`/api/*`, `/admin/*`)
-- [ ] **Priority system** - Proxy routes take precedence over static files
-- [ ] **Path manipulation** - Support for path stripping/rewriting
-- [ ] **Wildcard support** - Handle `/*` and specific path patterns
+### 2.1 Proxy Route Matching ✅ **COMPLETED**
+- [x] **Route matching engine** - Implement path-based routing (`/api/*`, `/admin/*`)
+- [x] **Priority system** - Proxy routes take precedence over static files
+- [x] **Path manipulation** - Support for path stripping/rewriting
+- [x] **Wildcard support** - Handle `/*` and specific path patterns
 
 ### 2.2 HTTP Proxy Implementation
 - [ ] **Request forwarding** - Forward HTTP method, headers, and body to target
