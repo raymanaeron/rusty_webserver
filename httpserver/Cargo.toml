@@ -17,3 +17,4 @@ httpserver-proxy = { path = "../httpserver-proxy" }
 clap = { workspace = true }
 tokio = { workspace = true }
 axum = { workspace = true }
+axum-tungstenite = { workspace = true }

@@ -6,7 +6,7 @@ use httpserver_proxy::ProxyHandler;
 use axum::{
     Router, 
     extract::{Request, ConnectInfo},
-    response::{Response, IntoResponse},
+    response::{IntoResponse},
     middleware::{self, Next},
     http::StatusCode,
 };
@@ -85,14 +85,15 @@ async fn proxy_middleware(
     axum::extract::State(state): axum::extract::State<Arc<ProxyHandler>>,
     req: Request,
     next: Next,
-) -> Response {
+) -> axum::response::Response {
     // Check if this request matches any proxy routes
     let path = req.uri().path().to_string();
     
     if let Some(_route_match) = state.find_route(&path) {
-        // This is a proxy request - handle it
+        // For now, WebSocket support is implemented but requires dedicated routing
+        // This middleware handles HTTP requests only
         match state.handle_request(req, addr).await {
-            Some(Ok(response)) => response,
+            Some(Ok(response)) => response.into_response(),
             Some(Err(proxy_error)) => proxy_error.into_response(),
             None => {
                 // This shouldn't happen since we found a route, but handle gracefully

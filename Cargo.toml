@@ -27,6 +27,11 @@ futures-util = "0.3"
 reqwest = { version = "0.11", features = ["json", "stream"] }
 toml = "0.8"
 
+# Phase 3.4 - WebSocket Support
+axum-tungstenite = "0.3"
+tokio-tungstenite = "0.20"
+tungstenite = "0.20"
+
 # Safer release profile for macOS app bundles
 # Avoids aggressive optimizations that can cause crashes with WebView/FFI
 [profile.release]

@@ -1,0 +1,88 @@
+# WebSocket Gateway Configuration Example
+# This configuration demonstrates WebSocket proxying with load balancing, 
+# sticky sessions, and mixed HTTP/WebSocket routing
+
+# Static file serving configuration
+[static]
+directory = "./public"
+fallback = "index.html"
+
+# HTTP API routes (standard load balancing)
+[[proxy]]
+path = "/api/*"
+targets = [
+    "http://localhost:3000",
+    "http://localhost:3001", 
+    "http://localhost:3002"
+]
+strategy = "round_robin"
+timeout = 30
+
+# HTTP API with weighted load balancing  
+[[proxy]]
+path = "/backend/*"
+targets = [
+    "http://localhost:4000",
+    "http://localhost:4001",
+    "http://localhost:4002"
+]
+strategy = "weighted_round_robin"
+timeout = 45
+
+# WebSocket routes with sticky sessions
+[[proxy]]
+path = "/ws/chat/*"
+targets = [
+    "http://localhost:5000",  # Will be converted to ws://localhost:5000
+    "http://localhost:5001",
+    "http://localhost:5002"
+]
+strategy = "least_connections"  # Best for WebSocket persistent connections
+timeout = 300  # Longer timeout for WebSocket connections
+# sticky_sessions = true  # TODO: Not yet implemented
+
+# WebSocket notifications with round-robin (for broadcast scenarios)
+[[proxy]]
+path = "/ws/notifications/*"
+targets = [
+    "http://localhost:6000",
+    "http://localhost:6001"
+]
+strategy = "round_robin"
+timeout = 600
+
+# Single WebSocket endpoint (legacy mode)
+[[proxy]]
+path = "/ws/events"
+target = "http://localhost:7000"
+timeout = 300
+
+# WebSocket with custom target weights
+[[proxy]]
+path = "/ws/realtime/*"
+targets = [
+    "http://localhost:8000",  # Higher capacity server
+    "http://localhost:8001",  # Lower capacity server  
+    "http://localhost:8002"   # Backup server
+]
+strategy = "weighted_round_robin"
+timeout = 300
+
+# Admin endpoints (HTTP only)
+[[proxy]]
+path = "/admin/*"
+target = "http://localhost:9000"
+strategy = "round_robin"
+timeout = 60
+
+# Health check endpoint
+[[proxy]]
+path = "/health"
+target = "http://localhost:9000"
+timeout = 10
+
+# Metrics endpoint  
+[[proxy]]
+path = "/metrics"
+target = "http://localhost:9001"
+timeout = 15
