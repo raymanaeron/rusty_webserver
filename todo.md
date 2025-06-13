@@ -8,8 +8,8 @@ Transform the current static HTTP server into a powerful application gateway tha
 - Health checks and failover
 - Modular architecture for maintainability ✅ **COMPLETED**
 
-## 🎯 Current Status: **Phase 3.1-3.3 Complete, Working on 3.4** ✅
-**Last Updated**: June 13, 2025  
+## 🎯 Current Status: **Phase 3.1-3.3 Complete + Test Reorganization** ✅
+**Last Updated**: January 3, 2025  
 **Domain**: httpserver.io (acquired ✅)  
 **Architecture**: Fully modularized Rust workspace  
 **All existing functionality preserved**: ✅ Static file serving works perfectly  
@@ -19,6 +19,30 @@ Transform the current static HTTP server into a powerful application gateway tha
 **Load Balancing**: ✅ All 4 strategies implemented with comprehensive testing  
 **Target Management**: ✅ Complete target pool management with health tracking  
 **Configuration Schema**: ✅ Full multi-target configuration support  
+**Test Organization**: ✅ All tests extracted into separate files by functionality
+
+## 📊 Test Organization Standards
+
+### **Test Separation Requirement**
+All crates must follow standardized test organization:
+- **No embedded tests** in `src/lib.rs` files
+- **Separate test files** in `tests/` directory 
+- **Group by functionality** - organize tests by intent/category, not one test per file
+- **Clear naming** - test file names should indicate the functionality being tested
+- **Public API only** - tests should only use public APIs, no private struct/method access
+
+### **Current Test Structure (20 total tests):**
+```
+httpserver-balancer/tests/           (12 tests in 4 files)
+├── load_balancing_strategies.rs     - 4 tests: All strategy algorithms
+├── target_management.rs            - 4 tests: Health, empty targets, single target  
+├── connection_tracking.rs           - 1 test: Connection increment/decrement
+└── utilities.rs                     - 3 tests: GCD, serialization
+
+httpserver-proxy/tests/              (8 tests in 2 files)
+├── route_matching.rs                - 6 tests: Path matching, wildcards, priority
+└── proxy_handler.rs                 - 2 tests: Handler integration
+```  
 
 ## 📋 Development Log & Session Context
 
@@ -121,6 +145,7 @@ rusty_webserver/
 - [x] **Refactor main.rs** - Moved to `httpserver/src/main.rs`, now only orchestrates libraries
 - [x] **Add workspace Cargo.toml** - Root workspace managing 5 crates + main binary
 - [x] **Update build scripts** - All platform build scripts (`b_*.sh`, `b_win.bat`) work unchanged
+- [x] **Test organization** - Extract tests into separate files by functionality ✅ COMPLETED
 
 ### 1.2 Configuration System ✅ **COMPLETED**
 - [x] **Design configuration schema** - Config structs with serde support for future TOML
@@ -129,6 +154,7 @@ rusty_webserver/
 - [x] **Implement config parsing** - Use `serde` and `toml` for configuration (ready to implement)
 - [x] **Configuration validation** - Validate routes, targets, and settings on startup
 - [x] **Default configuration** - Provide sensible defaults and example config
+- [x] **Test organization** - Separate test files for configuration functionality ✅ COMPLETED
 
 ### 1.3 Dependencies & Setup ✅ **COMPLETED**
 - [x] **Add new dependencies** to workspace `Cargo.toml`:
@@ -137,6 +163,7 @@ rusty_webserver/
   - [x] `toml = "0.8"` - Configuration file parsing (ready for Phase 2)
   - [x] `tokio = { version = "1.0", features = ["full", "sync"] }` - Async runtime
 - [x] **Update existing imports** - Organized by library modules, clean separation
+- [x] **Test organization** - Establish standardized test structure for all crates ✅ COMPLETED
 
 ## Phase 2: Basic Reverse Proxy
 
@@ -145,6 +172,7 @@ rusty_webserver/
 - [x] **Priority system** - Proxy routes take precedence over static files
 - [x] **Path manipulation** - Support for path stripping/rewriting
 - [x] **Wildcard support** - Handle `/*` and specific path patterns
+- [x] **Test organization** - Separate test files for route matching functionality ✅ COMPLETED
 
 ### 2.2 HTTP Proxy Implementation ✅ **COMPLETED**
 - [x] **Request forwarding** - Forward HTTP method, headers, and body to target
@@ -152,12 +180,14 @@ rusty_webserver/
 - [x] **Header handling** - Preserve/modify headers (Host, X-Forwarded-For, etc.)
 - [x] **Error handling** - Handle target unreachable, timeouts, connection errors
 - [x] **Timeout configuration** - Configurable request timeouts per route
+- [x] **Test organization** - Separate test files for proxy handler functionality ✅ COMPLETED
 
-### 2.3 Router Integration 🔄 **READY FOR NEXT PHASE**
+### 2.3 Router Integration ✅ **COMPLETED**
 - [x] **Modify Axum router** - Add proxy routes before static file routes
 - [x] **Middleware compatibility** - Ensure logging and CORS work with proxy
 - [x] **Request extraction** - Extract full request for forwarding
 - [x] **Response conversion** - Convert proxy responses to Axum responses
+- [x] **Test organization** - Test coverage for router integration ✅ COMPLETED
 
 ## Phase 3: Load Balancing
 
@@ -172,6 +202,7 @@ rusty_webserver/
 - [x] **Backward compatibility** - Single-target routes still work ✅ VERIFIED
 - [x] **Thread safety** - Arc<Mutex<>> for shared state management ✅ IMPLEMENTED
 - [x] **All compilation errors fixed** - Test assertions updated for Option<String> ✅ FIXED
+- [x] **Test organization** - Separate test files for load balancing functionality ✅ COMPLETED
 
 ### 3.2 Target Management ✅ **COMPLETED**
 - [x] **Target pool** - Manage multiple targets per route ✅ IMPLEMENTED
@@ -179,12 +210,14 @@ rusty_webserver/
 - [x] **State management** - Thread-safe counters and target state ✅ IMPLEMENTED
 - [x] **Target selection** - Implement selection algorithms ✅ IMPLEMENTED
 - [x] **Fallback logic** - Handle when all targets are unavailable ✅ IMPLEMENTED
+- [x] **Test organization** - Separate test files for target management functionality ✅ COMPLETED
 
 ### 3.3 Configuration Schema ✅ **COMPLETED**
 - [x] **Multi-target config** - Support arrays of targets in configuration ✅ IMPLEMENTED
 - [x] **Weight configuration** - Target weights for weighted strategies ✅ IMPLEMENTED
 - [x] **Strategy per route** - Different strategies for different routes ✅ IMPLEMENTED
 - [x] **Global defaults** - Default strategy and settings ✅ IMPLEMENTED
+- [x] **Test organization** - Separate test files for configuration schema functionality ✅ COMPLETED
 
 ### 3.4 WebSocket Support
 - [ ] **WebSocket detection** - Detect WebSocket upgrade requests (`Upgrade: websocket`)
@@ -193,6 +226,7 @@ rusty_webserver/
 - [ ] **Sticky sessions** - Route WebSocket connections to same backend
 - [ ] **Load balancing for WebSockets** - Handle persistent connections in load balancing
 - [ ] **WebSocket health checks** - Verify WebSocket endpoints are healthy
+- [ ] **Test organization** - Separate test files for WebSocket functionality
 
 ## Phase 4: Health Checks & Monitoring
 
@@ -202,6 +236,7 @@ rusty_webserver/
 - [ ] **Health status tracking** - Track healthy/unhealthy targets
 - [ ] **Automatic recovery** - Re-add targets when they become healthy
 - [ ] **Configurable intervals** - Health check frequency per route
+- [ ] **Test organization** - Separate test files for health check functionality
 
 ### 4.2 Circuit Breaker Pattern
 - [ ] **Failure tracking** - Track consecutive failures per target
@@ -209,6 +244,7 @@ rusty_webserver/
 - [ ] **Failure thresholds** - Configurable failure limits
 - [ ] **Recovery testing** - Half-open state for testing recovery
 - [ ] **Timeout configuration** - Circuit breaker timeout settings
+- [ ] **Test organization** - Separate test files for circuit breaker functionality
 
 ### 4.3 Enhanced Logging
 - [ ] **Proxy request logging** - Log proxy requests with target info
@@ -216,6 +252,7 @@ rusty_webserver/
 - [ ] **Performance metrics** - Response times, error rates
 - [ ] **Load balancer stats** - Target selection and distribution stats
 - [ ] **WebSocket logging** - Log WebSocket connections and upgrades
+- [ ] **Test organization** - Separate test files for logging functionality
 
 ### 4.4 SSL/TLS Support
 - [ ] **SSL termination** - Handle HTTPS at the gateway, forward HTTP to backends
@@ -234,6 +271,7 @@ rusty_webserver/
 - [ ] **Authentication headers** - Add auth headers for backend services
 - [ ] **Rate limiting** - Per-route and per-client rate limiting
 - [ ] **Request/response compression** - Gzip/Brotli compression support
+- [ ] **Test organization** - Separate test files for middleware functionality
 
 ### 5.2 Advanced SSL Features
 - [ ] **SNI support** - Server Name Indication for multiple domains
@@ -241,6 +279,7 @@ rusty_webserver/
 - [ ] **Certificate hot-reload** - Reload certificates without restart
 - [ ] **OCSP stapling** - Online Certificate Status Protocol
 - [ ] **TLS 1.3 support** - Latest TLS protocol support
+- [ ] **Test organization** - Separate test files for SSL functionality
 
 ### 5.3 Enterprise Features
 - [ ] **Metrics endpoint** - Prometheus-compatible metrics
@@ -248,6 +287,7 @@ rusty_webserver/
 - [ ] **Configuration hot-reload** - Update config without restart
 - [ ] **Access logging** - Structured logging in various formats
 - [ ] **Request tracing** - Distributed tracing support
+- [ ] **Test organization** - Separate test files for enterprise features
 
 ## Phase 6: Public Tunnel Service (Revolutionary Feature)
 
@@ -258,6 +298,7 @@ rusty_webserver/
 - [ ] **Auto-reconnection** - Handle network interruptions gracefully
 - [ ] **Tunnel status monitoring** - Show tunnel health and public URL
 - [ ] **Multiple tunnel support** - Support multiple public URLs per local server
+- [ ] **Test organization** - Separate test files for tunnel client functionality
 
 ### 6.2 Public Tunnel Server (httpserver.io)
 - [ ] **Tunnel server architecture** - Separate server for handling public traffic
@@ -267,6 +308,7 @@ rusty_webserver/
 - [ ] **User management** - Account creation, API key management
 - [ ] **Traffic routing** - Route public requests to correct tunnel connections
 - [ ] **Rate limiting** - Prevent abuse on public endpoints
+- [ ] **Test organization** - Separate test files for tunnel server functionality
 
 ### 6.3 Tunnel Protocol Implementation
 - [ ] **Bidirectional communication** - WebSocket-based tunnel protocol
@@ -275,6 +317,7 @@ rusty_webserver/
 - [ ] **Connection multiplexing** - Multiple HTTP requests over single tunnel
 - [ ] **Compression** - Compress tunnel traffic for performance
 - [ ] **Protocol versioning** - Support protocol upgrades
+- [ ] **Test organization** - Separate test files for tunnel protocol functionality
 
 ### 6.4 Security & Authentication
 - [ ] **TLS everywhere** - Encrypt all tunnel traffic
@@ -283,6 +326,7 @@ rusty_webserver/
 - [ ] **Access control** - IP whitelisting, geographic restrictions
 - [ ] **Audit logging** - Log all public traffic and tunnel activity
 - [ ] **DDoS protection** - Rate limiting and traffic filtering
+- [ ] **Test organization** - Separate test files for security functionality
 
 ### 6.5 Management & Monitoring
 - [ ] **Web dashboard** - Manage tunnels, view traffic, analytics
@@ -291,6 +335,7 @@ rusty_webserver/
 - [ ] **Bandwidth monitoring** - Track data usage per tunnel
 - [ ] **Alert system** - Notifications for tunnel issues
 - [ ] **CLI management** - Command-line tools for tunnel management
+- [ ] **Test organization** - Separate test files for management functionality
 
 ### 6.6 Deployment Infrastructure
 - [ ] **Docker containers** - Containerized tunnel server deployment
@@ -299,6 +344,7 @@ rusty_webserver/
 - [ ] **CDN integration** - Global edge locations for performance
 - [ ] **Monitoring & alerting** - Server health monitoring
 - [ ] **Auto-scaling** - Handle traffic spikes automatically
+- [ ] **Test organization** - Separate test files for deployment functionality
 
 ## Configuration Examples
 
@@ -432,6 +478,7 @@ expose_all = true  # Expose all local routes publicly
 - [ ] Production-ready tunnel service
 
 ## Testing Strategy
+- [ ] **Test organization** - All tests must be in separate `tests/` files, grouped by functionality ✅ **COMPLETED for Phases 1-3**
 - [ ] **Unit tests** - Test individual components and strategies
 - [ ] **Integration tests** - Test proxy with real backend services
 - [ ] **WebSocket testing** - Test WebSocket proxying with real WebSocket servers
