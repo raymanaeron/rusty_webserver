@@ -77,10 +77,21 @@ fn default_timeout() -> u64 {
 }
 
 impl Config {
-    /// Load configuration from file (future feature)
-    pub fn load_from_file(_path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
-        // TODO: Implement in Phase 2
-        Ok(Self::default())
+    /// Load configuration from TOML file
+    pub fn load_from_file(path: &PathBuf) -> Result<Self, Box<dyn std::error::Error>> {
+        // Read the configuration file
+        let content = std::fs::read_to_string(path)
+            .map_err(|e| format!("Failed to read config file '{}': {}", path.display(), e))?;
+        
+        // Parse TOML content
+        let config: Config = toml::from_str(&content)
+            .map_err(|e| format!("Failed to parse TOML in '{}': {}", path.display(), e))?;
+        
+        // Validate configuration
+        config.validate()?;
+        
+        println!("Loaded configuration from: {}", path.display());
+        Ok(config)
     }
     
     /// Create config from command line arguments
@@ -95,5 +106,45 @@ impl Config {
         config.static_config.directory = args.directory;
         
         Ok(config)
+    }
+    
+    /// Validate the configuration
+    pub fn validate(&self) -> Result<(), Box<dyn std::error::Error>> {
+        // Validate static directory exists
+        if !self.static_config.directory.exists() {
+            return Err(format!(
+                "Static directory does not exist: {}", 
+                self.static_config.directory.display()
+            ).into());
+        }
+        
+        // Validate proxy routes
+        for (index, route) in self.proxy.iter().enumerate() {
+            // Validate path pattern
+            if route.path.is_empty() {
+                return Err(format!("Proxy route {}: path cannot be empty", index).into());
+            }
+            
+            // Validate target URL
+            if route.target.is_empty() {
+                return Err(format!("Proxy route {}: target cannot be empty", index).into());
+            }
+            
+            // Basic URL validation
+            if !route.target.starts_with("http://") && !route.target.starts_with("https://") {
+                return Err(format!(
+                    "Proxy route {}: target must be a valid HTTP/HTTPS URL: {}", 
+                    index, route.target
+                ).into());
+            }
+            
+            // Validate timeout
+            if route.timeout == 0 {
+                return Err(format!("Proxy route {}: timeout must be greater than 0", index).into());
+            }
+        }
+        
+        println!("Configuration validation passed");
+        Ok(())
     }
 }

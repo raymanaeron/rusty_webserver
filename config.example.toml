@@ -1,0 +1,19 @@
+# httpserver configuration example
+# This file demonstrates the configuration options for the HTTP server
+
+[static_config]
+directory = "./public"
+fallback = "index.html"
+
+# Example proxy routes (for future Phase 2 implementation)
+# Uncomment and modify as needed when proxy features are available
+
+# [[proxy]]
+# path = "/api/*"
+# target = "http://localhost:3000"
+# timeout = 30
+
+# [[proxy]]
+# path = "/admin/*"
+# target = "http://localhost:8000"
+# timeout = 60

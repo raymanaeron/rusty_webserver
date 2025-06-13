@@ -1,0 +1,14 @@
+# Test configuration with proxy routes
+[static_config]
+directory = "."
+fallback = "index.html"
+
+[[proxy]]
+path = "/api/*"
+target = "http://localhost:3000"
+timeout = 30
+
+[[proxy]]
+path = "/admin/*"
+target = "http://localhost:8000"
+timeout = 60

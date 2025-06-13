@@ -1,0 +1,3 @@
+[static_config]
+directory = "./nonexistent"
+fallback = "index.html"

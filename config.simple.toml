@@ -1,0 +1,4 @@
+# Simple configuration for static file serving only
+[static_config]
+directory = "."
+fallback = "index.html"
