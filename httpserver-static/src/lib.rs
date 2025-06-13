@@ -4,9 +4,11 @@ use axum::{
     response::{IntoResponse, Response},
     routing::get,
     Router,
+    Json,
 };
 use httpserver_core::create_error_response;
 use mime_guess::from_path;
+use serde_json::{json, Value};
 use std::path::PathBuf;
 use tokio::fs;
 
@@ -105,4 +107,20 @@ async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
             create_error_response(StatusCode::NOT_FOUND, "File not found")
         }
     }
+}
+
+/// Health endpoint handler for static file service
+pub async fn static_health() -> Json<Value> {
+    Json(json!({
+        "status": "healthy",
+        "service": "httpserver-static",
+        "message": "Static file serving operational"
+    }))
+}
+
+/// Create static service health router
+pub fn create_static_health_router() -> Router {
+    Router::new()
+        .route("/static/health", get(static_health))
+        .route("/static/status", get(static_health))
 }

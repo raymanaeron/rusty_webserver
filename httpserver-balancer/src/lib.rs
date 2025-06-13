@@ -3,6 +3,28 @@ use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::collections::hash_map::DefaultHasher;
+use axum::{
+    routing::get,
+    Router,
+    Json,
+};
+use serde_json::{json, Value};
+
+/// Health endpoint handler for load balancer service
+pub async fn balancer_health() -> Json<Value> {
+    Json(json!({
+        "status": "healthy",
+        "service": "httpserver-balancer",
+        "message": "Load balancing service operational"
+    }))
+}
+
+/// Create balancer service health router
+pub fn create_balancer_health_router() -> Router {
+    Router::new()
+        .route("/balancer/health", get(balancer_health))
+        .route("/balancer/status", get(balancer_health))
+}
 
 /// Load balancing strategies
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

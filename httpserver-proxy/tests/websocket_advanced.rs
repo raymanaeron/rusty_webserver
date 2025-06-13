@@ -16,6 +16,7 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             strategy: LoadBalancingStrategy::LeastConnections,
             timeout: 300,
             sticky_sessions: false,
+            http_health: None,
             websocket_health: None,
         },        // WebSocket notifications with round-robin
         ProxyRoute {
@@ -28,6 +29,7 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 600,
             sticky_sessions: false,
+            http_health: None,
             websocket_health: None,
         },        // Weighted WebSocket route
         ProxyRoute {
@@ -41,6 +43,7 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             strategy: LoadBalancingStrategy::WeightedRoundRobin,
             timeout: 300,
             sticky_sessions: false,
+            http_health: None,
             websocket_health: None,
         },        // Single WebSocket endpoint (legacy)
         ProxyRoute {
@@ -50,6 +53,7 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 300,
             sticky_sessions: false,
+            http_health: None,
             websocket_health: None,
         },        // HTTP route for comparison
         ProxyRoute {
@@ -62,6 +66,7 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 30,
             sticky_sessions: false,
+            http_health: None,
             websocket_health: None,
         },
     ];

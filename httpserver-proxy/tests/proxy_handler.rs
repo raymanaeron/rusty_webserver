@@ -9,6 +9,7 @@ fn create_test_route(path: &str, target: &str) -> ProxyRoute {
         strategy: LoadBalancingStrategy::RoundRobin,
         timeout: 30,
         sticky_sessions: false,
+        http_health: None,
         websocket_health: None,
     }
 }

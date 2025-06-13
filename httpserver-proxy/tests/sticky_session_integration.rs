@@ -63,8 +63,7 @@ fn test_sticky_session_clear() {
 }
 
 #[test]
-fn test_proxy_handler_sticky_sessions() {
-    // Create proxy route with sticky sessions enabled
+fn test_proxy_handler_sticky_sessions() {    // Create proxy route with sticky sessions enabled
     let routes = vec![
         ProxyRoute {
             path: "/ws/chat/*".to_string(),
@@ -76,6 +75,7 @@ fn test_proxy_handler_sticky_sessions() {
             strategy: LoadBalancingStrategy::LeastConnections,
             timeout: 300,
             sticky_sessions: true,
+            http_health: None,
             websocket_health: None,
         }
     ];

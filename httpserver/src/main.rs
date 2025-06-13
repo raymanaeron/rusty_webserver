@@ -1,8 +1,9 @@
 use clap::Parser;
-use httpserver_config::{Args, Config};
-use httpserver_core::Server;
-use httpserver_static::StaticHandler;
+use httpserver_config::{Args, Config, create_config_health_router};
+use httpserver_core::{Server, create_health_router};
+use httpserver_static::{StaticHandler, create_static_health_router};
 use httpserver_proxy::ProxyHandler;
+use httpserver_balancer::create_balancer_health_router;
 use axum::{
     Router, 
     extract::{Request, ConnectInfo},
@@ -46,6 +47,14 @@ async fn create_router(
     // Start with the static file router
     let static_router = static_handler.create_router();
     
+    // Add gateway health endpoints with highest priority
+    let health_router = create_health_router();
+    
+    // Add service-specific health endpoints
+    let config_health_router = create_config_health_router();
+    let static_health_router = create_static_health_router();
+    let balancer_health_router = create_balancer_health_router();
+    
     // If proxy routes are configured, add proxy middleware with higher priority
     if proxy_handler.has_routes() {
         println!("Proxy routes configured: {}", proxy_handler.routes().len());
@@ -66,16 +75,28 @@ async fn create_router(
         
         // Create router with proxy middleware that runs before static file serving
         let app = static_router
+            .merge(health_router)
+            .merge(config_health_router)
+            .merge(static_health_router)
+            .merge(balancer_health_router)
             .layer(middleware::from_fn_with_state(
                 proxy_handler,
                 proxy_middleware
             ));
         
         println!("Proxy forwarding active - routes will be processed before static files");
+        println!("Health endpoints available: /health, /ping, /config/health, /static/health, /balancer/health");
         Ok(app)
     } else {
-        // No proxy routes, just return static router
-        Ok(static_router)
+        // No proxy routes, just return static router with health endpoints
+        let app = static_router
+            .merge(health_router)
+            .merge(config_health_router)
+            .merge(static_health_router)
+            .merge(balancer_health_router);
+        
+        println!("Health endpoints available: /health, /ping, /config/health, /static/health, /balancer/health");
+        Ok(app)
     }
 }
 

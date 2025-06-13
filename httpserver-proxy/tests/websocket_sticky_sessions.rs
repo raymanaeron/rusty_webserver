@@ -20,6 +20,7 @@ fn create_sticky_session_handler() -> ProxyHandler {
             strategy: LoadBalancingStrategy::LeastConnections, // Best for persistent connections
             timeout: 300,
             sticky_sessions: false,
+            http_health: None,
             websocket_health: None,
         },        // WebSocket route for broadcast scenarios (no sticky sessions needed)
         ProxyRoute {
@@ -32,6 +33,7 @@ fn create_sticky_session_handler() -> ProxyHandler {
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 300,
             sticky_sessions: false,
+            http_health: None,
             websocket_health: None,
         },
     ];
@@ -306,8 +308,7 @@ fn test_websocket_health_aware_routing() {
 
 // Test error handling for WebSocket routing edge cases
 #[test]
-fn test_websocket_routing_edge_cases() {
-    // Test with no targets configured
+fn test_websocket_routing_edge_cases() {    // Test with no targets configured
     let empty_routes = vec![
         ProxyRoute {
             path: "/ws/empty/*".to_string(),
@@ -316,6 +317,7 @@ fn test_websocket_routing_edge_cases() {
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 300,
             sticky_sessions: false,
+            http_health: None,
             websocket_health: None,
         },
     ];

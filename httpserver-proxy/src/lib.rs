@@ -10,14 +10,16 @@ use futures_util::{sink::SinkExt, stream::StreamExt};
 use std::{net::SocketAddr, time::Duration, collections::HashMap};
 
 // Re-export types from dependencies
-pub use httpserver_config::{ProxyRoute, Target, LoadBalancingStrategy, WebSocketHealthConfig};
+pub use httpserver_config::{ProxyRoute, Target, LoadBalancingStrategy, WebSocketHealthConfig, HttpHealthConfig};
 pub use httpserver_balancer::LoadBalancer;
 
-// WebSocket health check module
+// Health check modules
 pub mod websocket_health;
+pub mod http_health;
 pub mod health_integration;
 
 pub use websocket_health::{WebSocketHealthChecker, WebSocketHealthMonitor};
+pub use http_health::{HttpHealthChecker, HttpHealthMonitor};
 pub use health_integration::{HealthCheckIntegration, HealthSummary};
 
 /// Route matching engine for reverse proxy

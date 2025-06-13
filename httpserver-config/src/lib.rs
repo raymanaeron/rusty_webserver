@@ -1,6 +1,12 @@
 use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use axum::{
+    routing::get,
+    Router,
+    Json,
+};
+use serde_json::{json, Value};
 
 // Re-export types from balancer crate
 pub use httpserver_balancer::{LoadBalancingStrategy, Target};
@@ -71,9 +77,53 @@ pub struct ProxyRoute {
     #[serde(default)]
     pub sticky_sessions: bool,
     
+    /// HTTP health check configuration
+    #[serde(default)]
+    pub http_health: Option<HttpHealthConfig>,
+
     /// WebSocket health check configuration
     #[serde(default)]
     pub websocket_health: Option<WebSocketHealthConfig>,
+}
+
+/// HTTP health check configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpHealthConfig {
+    /// Health check interval in seconds
+    #[serde(default = "default_health_interval")]
+    pub interval: u64,
+    
+    /// Health check timeout in seconds
+    #[serde(default = "default_health_timeout")]
+    pub timeout: u64,
+    
+    /// HTTP health check path (relative to target URL)
+    #[serde(default = "default_health_path")]
+    pub path: String,
+    
+    /// Expected HTTP status codes (default: 200-299)
+    #[serde(default = "default_expected_status_codes")]
+    pub expected_status_codes: Vec<u16>,
+}
+
+fn default_expected_status_codes() -> Vec<u16> {
+    vec![200] // Default to just 200 OK
+}
+
+fn default_health_interval() -> u64 {
+    30 // 30 seconds
+}
+
+fn default_health_timeout() -> u64 {
+    5 // 5 seconds
+}
+
+fn default_health_path() -> String {
+    "/health".to_string()
+}
+
+fn default_ping_message() -> String {
+    "ping".to_string()
 }
 
 /// WebSocket health check configuration
@@ -91,25 +141,9 @@ pub struct WebSocketHealthConfig {
     #[serde(default = "default_health_path")]
     pub path: String,
     
-    /// Ping message to send for health checks
+    /// Ping message to send for WebSocket health checks
     #[serde(default = "default_ping_message")]
     pub ping_message: String,
-}
-
-fn default_health_interval() -> u64 {
-    30 // 30 seconds
-}
-
-fn default_health_timeout() -> u64 {
-    5 // 5 seconds
-}
-
-fn default_health_path() -> String {
-    "/health".to_string()
-}
-
-fn default_ping_message() -> String {
-    "ping".to_string()
 }
 
 impl Default for Config {
@@ -263,4 +297,30 @@ impl ProxyRoute {
         
         Ok(())
     }
+}
+
+/// Health status information for the config service
+#[derive(Debug, Clone, Serialize)]
+pub struct ConfigHealthStatus {
+    pub status: String,
+    pub service: String,
+    pub config_loaded: bool,
+    pub proxy_routes_count: usize,
+    pub static_config_valid: bool,
+}
+
+/// Health endpoint handler for config service
+pub async fn config_health() -> Json<Value> {
+    Json(json!({
+        "status": "healthy",
+        "service": "httpserver-config",
+        "message": "Configuration parsing service operational"
+    }))
+}
+
+/// Create config service health router
+pub fn create_config_health_router() -> Router {
+    Router::new()
+        .route("/config/health", get(config_health))
+        .route("/config/status", get(config_health))
 }

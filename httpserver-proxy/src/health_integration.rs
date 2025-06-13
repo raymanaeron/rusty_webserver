@@ -1,13 +1,15 @@
-// WebSocket health check integration with load balancer
+// Health check integration with load balancer (HTTP and WebSocket)
 use std::sync::Arc;
-use httpserver_config::WebSocketHealthConfig;
+use httpserver_config::{WebSocketHealthConfig, HttpHealthConfig};
 use httpserver_balancer::LoadBalancer;
 use crate::websocket_health::WebSocketHealthMonitor;
+use crate::http_health::HttpHealthMonitor;
 
 /// Health check integration manager
 pub struct HealthCheckIntegration {
     load_balancer: Arc<LoadBalancer>,
-    health_monitor: Option<WebSocketHealthMonitor>,
+    websocket_health_monitor: Option<WebSocketHealthMonitor>,
+    http_health_monitor: Option<HttpHealthMonitor>,
 }
 
 impl HealthCheckIntegration {
@@ -15,8 +17,38 @@ impl HealthCheckIntegration {
     pub fn new(load_balancer: Arc<LoadBalancer>) -> Self {
         Self {
             load_balancer,
-            health_monitor: None,
+            websocket_health_monitor: None,
+            http_health_monitor: None,
         }
+    }
+
+    /// Start HTTP health monitoring with load balancer integration
+    pub async fn start_http_health_monitoring(&mut self, config: HttpHealthConfig) -> Result<(), String> {
+        // Extract target URLs from the load balancer
+        let targets: Vec<String> = self.load_balancer.targets()
+            .iter()
+            .map(|target| target.url.clone())
+            .collect();
+
+        if targets.is_empty() {
+            return Err("No targets available for HTTP health monitoring".to_string());
+        }
+
+        // Create the health monitor
+        let monitor = HttpHealthMonitor::new(config, targets);
+        
+        // Start monitoring with callback to update load balancer health
+        let load_balancer_clone = self.load_balancer.clone();
+        let _handle = monitor.start_monitoring_with_callback(move |target_url, is_healthy| {
+            load_balancer_clone.set_target_health(target_url, is_healthy);
+        }).await;
+
+        self.http_health_monitor = Some(monitor);
+        
+        println!("HTTP health monitoring started for {} targets", 
+            self.load_balancer.targets().len());
+        
+        Ok(())
     }
 
     /// Start WebSocket health monitoring with load balancer integration
@@ -38,9 +70,7 @@ impl HealthCheckIntegration {
         let load_balancer_clone = self.load_balancer.clone();
         let _handle = monitor.start_monitoring_with_callback(move |target_url, is_healthy| {
             load_balancer_clone.set_target_health(target_url, is_healthy);
-        }).await;
-
-        self.health_monitor = Some(monitor);
+        }).await;        self.websocket_health_monitor = Some(monitor);
         
         println!("WebSocket health monitoring started for {} targets", 
             self.load_balancer.targets().len());
@@ -57,7 +87,7 @@ impl HealthCheckIntegration {
             total_targets,
             healthy_targets,
             unhealthy_targets: total_targets - healthy_targets,
-            monitoring_enabled: self.health_monitor.is_some(),
+            monitoring_enabled: self.websocket_health_monitor.is_some() || self.http_health_monitor.is_some(),
         }
     }
 }

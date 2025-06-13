@@ -2,13 +2,15 @@ use axum::{
     extract::{ConnectInfo, Request},
     http::StatusCode,
     middleware::Next,
-    response::Response,
+    response::{Response, Json},
     Router,
+    routing::get,
 };
 use chrono::Utc;
 use std::net::SocketAddr;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
+use serde_json::json;
 
 /// Core server functionality
 pub struct Server {
@@ -77,6 +79,23 @@ pub async fn logging_middleware(
     );
     
     response
+}
+
+/// Gateway health endpoint handler
+pub async fn gateway_health() -> Json<serde_json::Value> {
+    Json(json!({
+        "status": "healthy",
+        "service": "httpserver-gateway",
+        "timestamp": Utc::now().to_rfc3339(),
+        "version": env!("CARGO_PKG_VERSION")
+    }))
+}
+
+/// Create gateway health endpoint router
+pub fn create_health_router() -> Router {
+    Router::new()
+        .route("/health", get(gateway_health))
+        .route("/ping", get(gateway_health))
 }
 
 /// Create a standard error response
