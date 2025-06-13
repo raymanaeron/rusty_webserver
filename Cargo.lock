@@ -563,12 +563,17 @@ dependencies = [
 [[package]]
 name = "httpserver-balancer"
 version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
 
 [[package]]
 name = "httpserver-config"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "httpserver-balancer",
  "serde",
  "toml",
 ]
@@ -589,6 +594,7 @@ name = "httpserver-proxy"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "httpserver-balancer",
  "httpserver-config",
  "reqwest",
  "tokio",

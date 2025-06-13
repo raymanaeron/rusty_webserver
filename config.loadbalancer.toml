@@ -1,0 +1,56 @@
+# Load Balancer Configuration Example - Phase 3.1
+# This demonstrates the new multi-target load balancing capabilities
+
+[static_config]
+directory = "."
+fallback = "index.html"
+
+# Round-robin load balancing
+[[proxy]]
+path = "/api/*"
+strategy = "round_robin"
+timeout = 30
+targets = [
+    { url = "http://localhost:3000" },
+    { url = "http://localhost:3001" },
+    { url = "http://localhost:3002" }
+]
+
+# Weighted round-robin load balancing
+[[proxy]]
+path = "/upload/*"
+strategy = "weighted_round_robin"
+timeout = 60
+targets = [
+    { url = "http://localhost:4000", weight = 3 },  # High-performance server
+    { url = "http://localhost:4001", weight = 2 },  # Medium-performance server
+    { url = "http://localhost:4002", weight = 1 }   # Basic server
+]
+
+# Random load balancing
+[[proxy]]
+path = "/cache/*"
+strategy = "random"
+timeout = 15
+targets = [
+    { url = "http://localhost:5000" },
+    { url = "http://localhost:5001" },
+    { url = "http://localhost:5002" },
+    { url = "http://localhost:5003" }
+]
+
+# Least connections load balancing for long-running requests
+[[proxy]]
+path = "/stream/*"
+strategy = "least_connections"
+timeout = 120
+targets = [
+    { url = "http://localhost:6000" },
+    { url = "http://localhost:6001" }
+]
+
+# Backward compatibility: single target (legacy format)
+[[proxy]]
+path = "/health"
+target = "http://localhost:3000"
+timeout = 5

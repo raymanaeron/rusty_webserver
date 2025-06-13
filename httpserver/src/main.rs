@@ -50,7 +50,15 @@ async fn create_router(
     if proxy_handler.has_routes() {
         println!("Proxy routes configured: {}", proxy_handler.routes().len());
         for route in proxy_handler.routes() {
-            println!("  {} -> {}", route.path, route.target);
+            let targets = route.get_targets();
+            if targets.len() > 1 {
+                println!("  {} -> {} targets ({})", route.path, targets.len(), route.strategy);
+                for (i, target) in targets.iter().enumerate() {
+                    println!("    {}. {} (weight: {})", i + 1, target.url, target.weight);
+                }
+            } else if let Some(target_url) = route.get_primary_target() {
+                println!("  {} -> {}", route.path, target_url);
+            }
         }
         
         // Wrap proxy handler in Arc for sharing across requests

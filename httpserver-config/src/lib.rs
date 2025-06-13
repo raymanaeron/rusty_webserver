@@ -2,6 +2,9 @@ use clap::Parser;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+// Re-export types from balancer crate
+pub use httpserver_balancer::{LoadBalancingStrategy, Target};
+
 /// Command line arguments
 #[derive(Parser)]
 #[command(name = "httpserver")]
@@ -48,8 +51,17 @@ pub struct ProxyRoute {
     /// Path pattern to match
     pub path: String,
     
-    /// Target URL or URLs
-    pub target: String,
+    /// Single target URL (legacy - will be deprecated)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub target: Option<String>,
+    
+    /// Multiple targets for load balancing
+    #[serde(default)]
+    pub targets: Vec<Target>,
+    
+    /// Load balancing strategy
+    #[serde(default)]
+    pub strategy: LoadBalancingStrategy,
     
     /// Request timeout in seconds
     #[serde(default = "default_timeout")]
@@ -120,31 +132,91 @@ impl Config {
         
         // Validate proxy routes
         for (index, route) in self.proxy.iter().enumerate() {
-            // Validate path pattern
-            if route.path.is_empty() {
-                return Err(format!("Proxy route {}: path cannot be empty", index).into());
-            }
-            
-            // Validate target URL
-            if route.target.is_empty() {
-                return Err(format!("Proxy route {}: target cannot be empty", index).into());
-            }
-            
-            // Basic URL validation
-            if !route.target.starts_with("http://") && !route.target.starts_with("https://") {
-                return Err(format!(
-                    "Proxy route {}: target must be a valid HTTP/HTTPS URL: {}", 
-                    index, route.target
-                ).into());
-            }
-            
-            // Validate timeout
-            if route.timeout == 0 {
-                return Err(format!("Proxy route {}: timeout must be greater than 0", index).into());
-            }
+            route.validate(index)?;
         }
         
         println!("Configuration validation passed");
+        Ok(())
+    }
+}
+
+impl ProxyRoute {
+    /// Get all targets for this route (handles both legacy single target and new multiple targets)
+    pub fn get_targets(&self) -> Vec<Target> {
+        if !self.targets.is_empty() {
+            // New style: multiple targets
+            self.targets.clone()
+        } else if let Some(ref target_url) = self.target {
+            // Legacy style: single target
+            vec![Target::new(target_url.clone())]
+        } else {
+            // No targets configured
+            vec![]
+        }
+    }
+    
+    /// Get the first target URL (for backward compatibility)
+    pub fn get_primary_target(&self) -> Option<String> {
+        if !self.targets.is_empty() {
+            Some(self.targets[0].url.clone())
+        } else {
+            self.target.clone()
+        }
+    }
+    
+    /// Check if this route has multiple targets (load balancing enabled)
+    pub fn has_multiple_targets(&self) -> bool {
+        self.get_targets().len() > 1
+    }
+    
+    /// Validate this proxy route
+    fn validate(&self, index: usize) -> Result<(), Box<dyn std::error::Error>> {
+        // Validate path pattern
+        if self.path.is_empty() {
+            return Err(format!("Proxy route {}: path cannot be empty", index).into());
+        }
+        
+        let targets = self.get_targets();
+        
+        // Validate that at least one target is configured
+        if targets.is_empty() {
+            return Err(format!(
+                "Proxy route {}: must have at least one target (use 'target' or 'targets')", 
+                index
+            ).into());
+        }
+        
+        // Validate all target URLs
+        for (target_index, target) in targets.iter().enumerate() {
+            if target.url.is_empty() {
+                return Err(format!(
+                    "Proxy route {} target {}: URL cannot be empty", 
+                    index, target_index
+                ).into());
+            }
+            
+            // Basic URL validation
+            if !target.url.starts_with("http://") && !target.url.starts_with("https://") {
+                return Err(format!(
+                    "Proxy route {} target {}: must be a valid HTTP/HTTPS URL: {}", 
+                    index, target_index, target.url
+                ).into());
+            }
+            
+            // Validate weight
+            if target.weight == 0 {
+                return Err(format!(
+                    "Proxy route {} target {}: weight must be greater than 0", 
+                    index, target_index
+                ).into());
+            }
+        }
+        
+        // Validate timeout
+        if self.timeout == 0 {
+            return Err(format!("Proxy route {}: timeout must be greater than 0", index).into());
+        }
+        
         Ok(())
     }
 }

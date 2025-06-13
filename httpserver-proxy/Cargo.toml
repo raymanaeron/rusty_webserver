@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 httpserver-config = { path = "../httpserver-config" }
+httpserver-balancer = { path = "../httpserver-balancer" }
 reqwest = { workspace = true }
 tokio = { workspace = true }
 axum = { workspace = true }

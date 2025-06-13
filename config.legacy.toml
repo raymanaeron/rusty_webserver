@@ -1,0 +1,15 @@
+# Legacy Configuration Test - Single target format
+[static_config]
+directory = "."
+fallback = "index.html"
+
+# Legacy single target format
+[[proxy]]
+path = "/api/*"
+target = "http://localhost:3000"
+timeout = 30
+
+[[proxy]]
+path = "/health"
+target = "http://localhost:3001"
+timeout = 5

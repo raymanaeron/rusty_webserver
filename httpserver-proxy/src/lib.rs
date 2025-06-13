@@ -1,11 +1,14 @@
-use httpserver_config::ProxyRoute;
 use axum::{
     extract::Request,
     response::{Response, IntoResponse},
     http::{StatusCode, HeaderMap, HeaderName, HeaderValue},
     body::Body,
 };
-use std::{net::SocketAddr, time::Duration};
+use std::{net::SocketAddr, time::Duration, collections::HashMap};
+
+// Re-export types from dependencies
+pub use httpserver_config::{ProxyRoute, Target, LoadBalancingStrategy};
+pub use httpserver_balancer::LoadBalancer;
 
 /// Route matching engine for reverse proxy
 pub struct RouteMatch {
@@ -161,17 +164,30 @@ pub struct ProxyHandler {
     route_matcher: RouteMatcher,
     /// HTTP forwarder for handling requests
     forwarder: ProxyForwarder,
+    /// Load balancers per route (keyed by route path)
+    load_balancers: HashMap<String, LoadBalancer>,
 }
 
 impl ProxyHandler {
     /// Create a new proxy handler with the given routes
     pub fn new(routes: Vec<ProxyRoute>) -> Self {
-        let route_matcher = RouteMatcher::new(routes);
+        let route_matcher = RouteMatcher::new(routes.clone());
         let forwarder = ProxyForwarder::new();
+        
+        // Create load balancers for each route
+        let mut load_balancers = HashMap::new();
+        for route in routes {
+            let targets = route.get_targets();
+            if !targets.is_empty() {
+                let balancer = LoadBalancer::new(targets, route.strategy.clone());
+                load_balancers.insert(route.path.clone(), balancer);
+            }
+        }
         
         Self {
             route_matcher,
             forwarder,
+            load_balancers,
         }
     }
     
@@ -201,7 +217,32 @@ impl ProxyHandler {
         
         // Find matching route
         if let Some(route_match) = self.find_route(path) {
-            Some(self.forwarder.forward_request(req, &route_match, client_ip).await)
+            // Get the load balancer for this route
+            if let Some(load_balancer) = self.load_balancers.get(&route_match.route.path) {
+                // Select target using load balancer
+                if let Some(target) = load_balancer.select_target() {
+                    // Track request start
+                    load_balancer.start_request(&target.url);
+                    
+                    // Forward the request
+                    let result = self.forwarder.forward_request(req, &route_match, &target.url, client_ip).await;
+                    
+                    // Track request end
+                    load_balancer.end_request(&target.url);
+                    
+                    Some(result)
+                } else {
+                    // No healthy targets available
+                    Some(Err(ProxyError::ConnectionFailed("No healthy targets available".to_string())))
+                }
+            } else {
+                // Fallback to legacy single target mode
+                if let Some(target_url) = route_match.route.get_primary_target() {
+                    Some(self.forwarder.forward_request_legacy(req, &route_match, &target_url, client_ip).await)
+                } else {
+                    Some(Err(ProxyError::InvalidUrl("No target configured for route".to_string())))
+                }
+            }
         } else {
             None
         }
@@ -225,17 +266,18 @@ impl ProxyForwarder {
         Self { client }
     }
     
-    /// Forward a request to the target server
-    pub    async fn forward_request(
+    /// Forward request to a specific target URL (new load-balanced method)
+    async fn forward_request(
         &self,
         req: Request<Body>,
         route_match: &RouteMatch,
+        target_url: &str,
         client_ip: SocketAddr,
     ) -> Result<Response<Body>, ProxyError> {
         let start_time = std::time::Instant::now();
         
         // Build the target URL
-        let target_url = self.build_target_url(&route_match.route.target, &route_match.stripped_path)?;
+        let full_target_url = self.build_target_url(target_url, &route_match.stripped_path)?;
         
         // Extract request components before consuming the body
         let method = req.method().clone();
@@ -257,11 +299,11 @@ impl ProxyForwarder {
         };
         
         let mut proxy_req = self.client
-            .request(reqwest_method, &target_url)
+            .request(reqwest_method, &full_target_url)
             .timeout(Duration::from_secs(route_match.route.timeout));
         
         // Forward headers (with modifications)
-        let forwarded_headers = self.prepare_headers(&headers, &client_ip, &target_url)?;
+        let forwarded_headers = self.prepare_headers(&headers, &client_ip, &full_target_url)?;
         for (name_str, value_str) in forwarded_headers {
             if let (Ok(req_name), Ok(req_value)) = (
                 reqwest::header::HeaderName::from_bytes(name_str.as_bytes()),
@@ -282,7 +324,7 @@ impl ProxyForwarder {
                 if e.is_timeout() {
                     ProxyError::Timeout(route_match.route.timeout)
                 } else if e.is_connect() {
-                    ProxyError::ConnectionFailed(target_url.clone())
+                    ProxyError::ConnectionFailed(full_target_url.clone())
                 } else {
                     ProxyError::RequestFailed(e.to_string())
                 }
@@ -296,10 +338,21 @@ impl ProxyForwarder {
         println!("PROXY {} {} -> {} ({}ms)", 
                 method, 
                 uri, 
-                target_url, 
+                full_target_url, 
                 duration.as_millis());
         
         Ok(response)
+    }
+    
+    /// Forward request using legacy single target (for backward compatibility)
+    async fn forward_request_legacy(
+        &self,
+        req: Request<Body>,
+        route_match: &RouteMatch,
+        target_url: &str,
+        client_ip: SocketAddr,
+    ) -> Result<Response<Body>, ProxyError> {
+        self.forward_request(req, route_match, target_url, client_ip).await
     }
     
     /// Build the target URL by combining target and stripped path
@@ -503,7 +556,9 @@ mod tests {
     fn create_test_route(path: &str, target: &str) -> ProxyRoute {
         ProxyRoute {
             path: path.to_string(),
-            target: target.to_string(),
+            target: Some(target.to_string()),
+            targets: vec![],
+            strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 30,
         }
     }
@@ -519,12 +574,12 @@ mod tests {
         
         // Test exact matches
         let result = matcher.find_match("/health").unwrap();
-        assert_eq!(result.route.target, "http://localhost:3000");
+        assert_eq!(result.route.target, Some("http://localhost:3000".to_string()));
         assert_eq!(result.stripped_path, "");
         assert!(!result.is_wildcard);
         
         let result = matcher.find_match("/status").unwrap();
-        assert_eq!(result.route.target, "http://localhost:3001");
+        assert_eq!(result.route.target, Some("http://localhost:3001".to_string()));
         assert_eq!(result.stripped_path, "");
         assert!(!result.is_wildcard);
         
@@ -544,23 +599,23 @@ mod tests {
         
         // Test wildcard matches
         let result = matcher.find_match("/api/users").unwrap();
-        assert_eq!(result.route.target, "http://localhost:3000");
+        assert_eq!(result.route.target, Some("http://localhost:3000".to_string()));
         assert_eq!(result.stripped_path, "/users");
         assert!(result.is_wildcard);
         
         let result = matcher.find_match("/api/users/123").unwrap();
-        assert_eq!(result.route.target, "http://localhost:3000");
+        assert_eq!(result.route.target, Some("http://localhost:3000".to_string()));
         assert_eq!(result.stripped_path, "/users/123");
         assert!(result.is_wildcard);
         
         let result = matcher.find_match("/admin/dashboard").unwrap();
-        assert_eq!(result.route.target, "http://localhost:3001");
+        assert_eq!(result.route.target, Some("http://localhost:3001".to_string()));
         assert_eq!(result.stripped_path, "/dashboard");
         assert!(result.is_wildcard);
         
         // Test prefix-only matches
         let result = matcher.find_match("/api").unwrap();
-        assert_eq!(result.route.target, "http://localhost:3000");
+        assert_eq!(result.route.target, Some("http://localhost:3000".to_string()));
         assert_eq!(result.stripped_path, "");
         assert!(result.is_wildcard);
         
@@ -579,12 +634,12 @@ mod tests {
         
         // Exact match should win over wildcard due to order
         let result = matcher.find_match("/api/health").unwrap();
-        assert_eq!(result.route.target, "http://localhost:3000");
+        assert_eq!(result.route.target, Some("http://localhost:3000".to_string()));
         assert!(!result.is_wildcard);
         
         // Wildcard should match other paths
         let result = matcher.find_match("/api/users").unwrap();
-        assert_eq!(result.route.target, "http://localhost:3001");
+        assert_eq!(result.route.target, Some("http://localhost:3001".to_string()));
         assert!(result.is_wildcard);
     }
 
@@ -614,12 +669,12 @@ mod tests {
         
         // Test that global wildcard matches everything
         let result = matcher.find_match("/any/path").unwrap();
-        assert_eq!(result.route.target, "http://localhost:3000");
+        assert_eq!(result.route.target, Some("http://localhost:3000".to_string()));
         assert_eq!(result.stripped_path, "/any/path");
         assert!(result.is_wildcard);
         
         let result = matcher.find_match("/").unwrap();
-        assert_eq!(result.route.target, "http://localhost:3000");
+        assert_eq!(result.route.target, Some("http://localhost:3000".to_string()));
         assert_eq!(result.stripped_path, "/");
         assert!(result.is_wildcard);
     }
@@ -666,11 +721,11 @@ mod tests {
         assert_eq!(handler.routes().len(), 2);
         
         let result = handler.find_route("/api/users").unwrap();
-        assert_eq!(result.route.target, "http://localhost:3000");
+        assert_eq!(result.route.get_primary_target().unwrap(), "http://localhost:3000");
         assert_eq!(result.stripped_path, "/users");
         
         let result = handler.find_route("/health").unwrap();
-        assert_eq!(result.route.target, "http://localhost:3001");
+        assert_eq!(result.route.get_primary_target().unwrap(), "http://localhost:3001");
         assert_eq!(result.stripped_path, "");
     }
 }

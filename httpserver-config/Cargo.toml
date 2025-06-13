@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 serde = { workspace = true }
 clap = { workspace = true }
+httpserver-balancer = { path = "../httpserver-balancer" }
 
 # Future dependencies for Phase 2+
 toml = { workspace = true }
