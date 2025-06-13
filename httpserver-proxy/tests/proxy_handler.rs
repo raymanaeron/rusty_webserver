@@ -8,6 +8,8 @@ fn create_test_route(path: &str, target: &str) -> ProxyRoute {
         targets: vec![],
         strategy: LoadBalancingStrategy::RoundRobin,
         timeout: 30,
+        sticky_sessions: false,
+        websocket_health: None,
     }
 }
 

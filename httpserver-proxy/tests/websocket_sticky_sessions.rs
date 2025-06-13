@@ -8,8 +8,7 @@ use axum::{extract::Request, body::Body};
 use std::collections::HashMap;
 
 fn create_sticky_session_handler() -> ProxyHandler {
-    let routes = vec![
-        // WebSocket route that should maintain sticky sessions
+    let routes = vec![        // WebSocket route that should maintain sticky sessions
         ProxyRoute {
             path: "/ws/stateful/*".to_string(),
             targets: vec![
@@ -20,8 +19,9 @@ fn create_sticky_session_handler() -> ProxyHandler {
             target: None,
             strategy: LoadBalancingStrategy::LeastConnections, // Best for persistent connections
             timeout: 300,
-        },
-        // WebSocket route for broadcast scenarios (no sticky sessions needed)
+            sticky_sessions: false,
+            websocket_health: None,
+        },        // WebSocket route for broadcast scenarios (no sticky sessions needed)
         ProxyRoute {
             path: "/ws/broadcast/*".to_string(),
             targets: vec![
@@ -31,6 +31,8 @@ fn create_sticky_session_handler() -> ProxyHandler {
             target: None,
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 300,
+            sticky_sessions: false,
+            websocket_health: None,
         },
     ];
     
@@ -313,6 +315,8 @@ fn test_websocket_routing_edge_cases() {
             target: None,    // No legacy target either
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 300,
+            sticky_sessions: false,
+            websocket_health: None,
         },
     ];
     

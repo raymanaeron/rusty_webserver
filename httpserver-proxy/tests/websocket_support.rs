@@ -4,8 +4,7 @@ use httpserver_balancer::Target;
 use axum::{extract::Request, body::Body};
 
 fn create_test_proxy_handler() -> ProxyHandler {
-    let routes = vec![
-        ProxyRoute {
+    let routes = vec![        ProxyRoute {
             path: "/ws/*".to_string(),
             targets: vec![
                 Target::new("http://localhost:8001".to_string()),
@@ -14,6 +13,8 @@ fn create_test_proxy_handler() -> ProxyHandler {
             target: None,
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 30,
+            sticky_sessions: false,
+            websocket_health: None,
         },
         ProxyRoute {
             path: "/api/websocket".to_string(),
@@ -21,6 +22,8 @@ fn create_test_proxy_handler() -> ProxyHandler {
             target: Some("http://localhost:9000".to_string()),
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 30,
+            sticky_sessions: false,
+            websocket_health: None,
         },
     ];
     

@@ -10,8 +10,15 @@ use futures_util::{sink::SinkExt, stream::StreamExt};
 use std::{net::SocketAddr, time::Duration, collections::HashMap};
 
 // Re-export types from dependencies
-pub use httpserver_config::{ProxyRoute, Target, LoadBalancingStrategy};
+pub use httpserver_config::{ProxyRoute, Target, LoadBalancingStrategy, WebSocketHealthConfig};
 pub use httpserver_balancer::LoadBalancer;
+
+// WebSocket health check module
+pub mod websocket_health;
+pub mod health_integration;
+
+pub use websocket_health::{WebSocketHealthChecker, WebSocketHealthMonitor};
+pub use health_integration::{HealthCheckIntegration, HealthSummary};
 
 /// Route matching engine for reverse proxy
 pub struct RouteMatch {
@@ -222,8 +229,20 @@ impl ProxyHandler {
         if let Some(route_match) = self.find_route(path) {
             // Get the load balancer for this route
             if let Some(load_balancer) = self.load_balancers.get(&route_match.route.path) {
-                // Select target using load balancer
-                if let Some(target) = load_balancer.select_target() {
+                // Check if this is a WebSocket request that should use sticky sessions
+                let is_websocket = Self::is_websocket_request(&req);
+                let use_sticky_sessions = is_websocket && route_match.route.sticky_sessions;
+                
+                // Select target using appropriate strategy
+                let target = if use_sticky_sessions {
+                    // Use client IP as identifier for sticky sessions
+                    let client_id = client_ip.ip().to_string();
+                    load_balancer.select_target_sticky(&client_id)
+                } else {
+                    load_balancer.select_target()
+                };
+                
+                if let Some(target) = target {
                     // Track request start
                     load_balancer.start_request(&target.url);
                     
@@ -278,11 +297,15 @@ impl ProxyHandler {
         if let Some(route_match) = self.find_route(path) {
             // Get target URL for WebSocket proxying
             let target_url = if let Some(load_balancer) = self.load_balancers.get(&route_match.route.path) {
-                if let Some(target) = load_balancer.select_target() {
-                    Some(target.url.clone())
+                // Use sticky sessions for WebSocket if enabled
+                let target = if route_match.route.sticky_sessions {
+                    let client_id = client_ip.ip().to_string();
+                    load_balancer.select_target_sticky(&client_id)
                 } else {
-                    None
-                }
+                    load_balancer.select_target()
+                };
+                
+                target.map(|t| t.url.clone())
             } else {
                 // Fallback to legacy single target mode
                 route_match.route.get_primary_target()

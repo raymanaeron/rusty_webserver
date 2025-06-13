@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::collections::hash_map::DefaultHasher;
 
 /// Load balancing strategies
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -112,6 +114,10 @@ pub struct LoadBalancer {
     weighted_state: Arc<Mutex<WeightedRoundRobinState>>,
     /// Connection tracking for least-connections
     connection_tracker: Arc<Mutex<ConnectionTracker>>,
+    /// Sticky session mappings for client-to-backend affinity
+    sticky_sessions: Arc<Mutex<HashMap<u64, String>>>,
+    /// Dynamic health status tracking (overrides target.healthy)
+    health_status: Arc<Mutex<HashMap<String, bool>>>,
 }
 
 // Implement Send and Sync for LoadBalancer since all its fields are thread-safe
@@ -158,13 +164,26 @@ impl LoadBalancer {
             current_position: Arc::new(Mutex::new(0)),
             weighted_state,
             connection_tracker: Arc::new(Mutex::new(ConnectionTracker::new())),
+            sticky_sessions: Arc::new(Mutex::new(HashMap::new())),
+            health_status: Arc::new(Mutex::new(HashMap::new())),
         }
     }
     
+    /// Check if a target is healthy (considers both static and dynamic health status)
+    fn is_target_healthy(&self, target: &Target) -> bool {
+        let health_status = self.health_status.lock().unwrap();
+        
+        // Check dynamic health status first, fall back to static if not set
+        match health_status.get(&target.url) {
+            Some(&dynamic_health) => dynamic_health,
+            None => target.healthy, // Use static health status as default
+        }
+    }
+
     /// Select the next target based on the load balancing strategy
     pub fn select_target(&self) -> Option<&Target> {
         let healthy_targets: Vec<&Target> = self.targets.iter()
-            .filter(|target| target.healthy)
+            .filter(|target| self.is_target_healthy(target))
             .collect();
             
         if healthy_targets.is_empty() {
@@ -214,7 +233,7 @@ impl LoadBalancer {
             }
             
             let target = &self.targets[state.current_position];
-            if target.healthy && state.current_weights[state.current_position] > 0 {
+            if self.is_target_healthy(target) && state.current_weights[state.current_position] > 0 {
                 return Some(target);
             }
             
@@ -227,7 +246,7 @@ impl LoadBalancer {
         // Fallback to round-robin if weighted selection fails
         drop(state);
         let healthy_targets: Vec<&Target> = self.targets.iter()
-            .filter(|target| target.healthy)
+            .filter(|target| self.is_target_healthy(target))
             .collect();
         self.round_robin_select(&healthy_targets)
     }
@@ -280,11 +299,13 @@ impl LoadBalancer {
         tracker.decrement(target_url);
     }
     
-    /// Mark a target as healthy or unhealthy
-    pub fn set_target_health(&mut self, target_url: &str, healthy: bool) {
-        if let Some(target) = self.targets.iter_mut().find(|t| t.url == target_url) {
-            target.healthy = healthy;
-        }
+    /// Mark a target as healthy or unhealthy (thread-safe)
+    pub fn set_target_health(&self, target_url: &str, healthy: bool) {
+        let mut health_status = self.health_status.lock().unwrap();
+        health_status.insert(target_url.to_string(), healthy);
+        
+        println!("Health status updated for {}: {}", target_url, 
+            if healthy { "HEALTHY" } else { "UNHEALTHY" });
     }
     
     /// Get all targets
@@ -299,12 +320,75 @@ impl LoadBalancer {
     
     /// Get healthy targets count
     pub fn healthy_targets_count(&self) -> usize {
-        self.targets.iter().filter(|t| t.healthy).count()
+        self.targets.iter().filter(|t| self.is_target_healthy(t)).count()
     }
     
     /// Get connection count for a target
     pub fn get_connection_count(&self, target_url: &str) -> u32 {
         let tracker = self.connection_tracker.lock().unwrap();
         tracker.get_connections(target_url)
+    }
+    
+    /// Select target with sticky session support based on client identifier
+    pub fn select_target_sticky(&self, client_id: &str) -> Option<&Target> {
+        let healthy_targets: Vec<&Target> = self.targets.iter()
+            .filter(|target| self.is_target_healthy(target))
+            .collect();
+            
+        if healthy_targets.is_empty() {
+            return None;
+        }
+        
+        // Hash the client identifier to get consistent target selection
+        let client_hash = self.hash_client_id(client_id);
+        
+        // Check if we have an existing sticky session for this client
+        {
+            let sticky_sessions = self.sticky_sessions.lock().unwrap();
+            if let Some(target_url) = sticky_sessions.get(&client_hash) {
+                // Return the sticky target if it's still healthy
+                if let Some(target) = self.targets.iter().find(|t| &t.url == target_url && self.is_target_healthy(t)) {
+                    return Some(target);
+                }
+                // If the sticky target is unhealthy, we'll select a new one below
+            }
+        }
+        
+        // No existing sticky session or target is unhealthy - select new target
+        let selected_target = match self.strategy {
+            LoadBalancingStrategy::RoundRobin => self.round_robin_select(&healthy_targets),
+            LoadBalancingStrategy::WeightedRoundRobin => self.weighted_round_robin_select(),
+            LoadBalancingStrategy::Random => self.random_select(&healthy_targets),
+            LoadBalancingStrategy::LeastConnections => self.least_connections_select(&healthy_targets),
+        };
+        
+        // Store the new sticky session mapping
+        if let Some(target) = selected_target {
+            let mut sticky_sessions = self.sticky_sessions.lock().unwrap();
+            sticky_sessions.insert(client_hash, target.url.clone());
+        }
+        
+        selected_target
+    }
+    
+    /// Hash a client identifier for consistent target selection
+    fn hash_client_id(&self, client_id: &str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        client_id.hash(&mut hasher);
+        hasher.finish()
+    }
+    
+    /// Clear sticky session for a client (useful when connection ends)
+    pub fn clear_sticky_session(&self, client_id: &str) {
+        let client_hash = self.hash_client_id(client_id);
+        let mut sticky_sessions = self.sticky_sessions.lock().unwrap();
+        sticky_sessions.remove(&client_hash);
+    }
+    
+    /// Get the sticky session target for a client (if any)
+    pub fn get_sticky_target(&self, client_id: &str) -> Option<String> {
+        let client_hash = self.hash_client_id(client_id);
+        let sticky_sessions = self.sticky_sessions.lock().unwrap();
+        sticky_sessions.get(&client_hash).cloned()
     }
 }

@@ -39,7 +39,14 @@ targets = [
 ]
 strategy = "least_connections"  # Best for WebSocket persistent connections
 timeout = 300  # Longer timeout for WebSocket connections
-# sticky_sessions = true  # TODO: Not yet implemented
+sticky_sessions = true  # Route same client to same backend
+
+# WebSocket health check configuration
+[websocket_health]
+interval = 30  # Check every 30 seconds
+timeout = 5    # 5 second timeout for health checks
+path = "/health"  # Health check endpoint on WebSocket targets
+ping_message = "health_ping"  # Message to send for health checks
 
 # WebSocket notifications with round-robin (for broadcast scenarios)
 [[proxy]]

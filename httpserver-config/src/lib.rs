@@ -66,6 +66,50 @@ pub struct ProxyRoute {
     /// Request timeout in seconds
     #[serde(default = "default_timeout")]
     pub timeout: u64,
+    
+    /// Enable sticky sessions for WebSocket connections
+    #[serde(default)]
+    pub sticky_sessions: bool,
+    
+    /// WebSocket health check configuration
+    #[serde(default)]
+    pub websocket_health: Option<WebSocketHealthConfig>,
+}
+
+/// WebSocket health check configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WebSocketHealthConfig {
+    /// Health check interval in seconds
+    #[serde(default = "default_health_interval")]
+    pub interval: u64,
+    
+    /// Health check timeout in seconds
+    #[serde(default = "default_health_timeout")]
+    pub timeout: u64,
+    
+    /// WebSocket health check path (relative to target URL)
+    #[serde(default = "default_health_path")]
+    pub path: String,
+    
+    /// Ping message to send for health checks
+    #[serde(default = "default_ping_message")]
+    pub ping_message: String,
+}
+
+fn default_health_interval() -> u64 {
+    30 // 30 seconds
+}
+
+fn default_health_timeout() -> u64 {
+    5 // 5 seconds
+}
+
+fn default_health_path() -> String {
+    "/health".to_string()
+}
+
+fn default_ping_message() -> String {
+    "ping".to_string()
 }
 
 impl Default for Config {

@@ -1,13 +1,14 @@
 use httpserver_proxy::RouteMatcher;
 use httpserver_config::{ProxyRoute, LoadBalancingStrategy};
 
-fn create_test_route(path: &str, target: &str) -> ProxyRoute {
-    ProxyRoute {
+fn create_test_route(path: &str, target: &str) -> ProxyRoute {    ProxyRoute {
         path: path.to_string(),
         target: Some(target.to_string()),
         targets: vec![],
         strategy: LoadBalancingStrategy::RoundRobin,
         timeout: 30,
+        sticky_sessions: false,
+        websocket_health: None,
     }
 }
 

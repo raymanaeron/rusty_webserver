@@ -23,7 +23,7 @@ fn test_no_healthy_targets() {
 #[test]
 fn test_target_health_management() {
     let targets = create_test_targets();
-    let mut balancer = LoadBalancer::new(targets, LoadBalancingStrategy::RoundRobin);
+    let balancer = LoadBalancer::new(targets, LoadBalancingStrategy::RoundRobin);
 
     assert_eq!(balancer.healthy_targets_count(), 3);
 
