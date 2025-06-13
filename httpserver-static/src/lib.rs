@@ -11,6 +11,7 @@ use mime_guess::from_path;
 use serde_json::{json, Value};
 use std::path::PathBuf;
 use tokio::fs;
+use tracing;
 
 /// Static file handler configuration
 pub struct StaticHandler {
@@ -24,12 +25,19 @@ impl StaticHandler {
         let resolved_dir = match base_dir.canonicalize() {
             Ok(path) => path,
             Err(e) => {
-                eprintln!("Error: Cannot access directory '{}': {}", base_dir.display(), e);
+                tracing::error!(
+                    directory = %base_dir.display(),
+                    error = %e,
+                    "Cannot access static files directory"
+                );
                 return Err(e.into());
             }
         };
 
-        println!("Serving files from: {}", resolved_dir.display());
+        tracing::info!(
+            directory = %resolved_dir.display(),
+            "Static file server initialized"
+        );
 
         Ok(Self {
             base_dir: resolved_dir,
@@ -52,6 +60,7 @@ impl StaticHandler {
 }
 
 /// Serve a single file from the static directory
+#[tracing::instrument(skip(base_dir), fields(base_dir = %base_dir.display()))]
 async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
     // Clean up the path and prevent directory traversal
     let requested_path = if path.is_empty() || path == "/" {
@@ -66,10 +75,23 @@ async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
     // Build the full file path
     let file_path = base_dir.join(clean_path);
 
+    tracing::debug!(
+        requested_path = %requested_path,
+        clean_path = %clean_path,
+        file_path = %file_path.display(),
+        "Processing static file request"
+    );
+
     // Security check: ensure the resolved path is within the base directory
     match file_path.canonicalize() {
         Ok(canonical_path) => {
             if !canonical_path.starts_with(&base_dir) {
+                tracing::warn!(
+                    requested_path = %requested_path,
+                    canonical_path = %canonical_path.display(),
+                    base_dir = %base_dir.display(),
+                    "Directory traversal attempt blocked"
+                );
                 return create_error_response(StatusCode::FORBIDDEN, "Access denied");
             }
         }
@@ -84,6 +106,14 @@ async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
             // Guess the MIME type based on file extension
             let mime_type = from_path(&file_path).first_or_octet_stream();
             
+            tracing::info!(
+                file_path = %file_path.display(),
+                file_size = contents.len(),
+                mime_type = %mime_type,
+                cache_control = "public, max-age=3600",
+                "Static file served successfully"
+            );
+            
             Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, mime_type.as_ref())
@@ -91,11 +121,24 @@ async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
                 .body(contents.into())
                 .unwrap()
         }
-        Err(_) => {
+        Err(e) => {
+            tracing::debug!(
+                file_path = %file_path.display(),
+                error = %e,
+                "Failed to read requested file, attempting SPA fallback"
+            );
+            
             // If the requested file doesn't exist, try to serve index.html for SPA support
             if clean_path != "index.html" {
                 let index_path = base_dir.join("index.html");
                 if let Ok(contents) = fs::read(&index_path).await {
+                    tracing::info!(
+                        original_path = %file_path.display(),
+                        fallback_path = %index_path.display(),
+                        file_size = contents.len(),
+                        "SPA fallback served index.html"
+                    );
+                    
                     return Response::builder()
                         .status(StatusCode::OK)
                         .header(header::CONTENT_TYPE, "text/html")
@@ -103,6 +146,12 @@ async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
                         .unwrap();
                 }
             }
+
+            tracing::warn!(
+                file_path = %file_path.display(),
+                error = %e,
+                "File not found and no fallback available"
+            );
 
             create_error_response(StatusCode::NOT_FOUND, "File not found")
         }

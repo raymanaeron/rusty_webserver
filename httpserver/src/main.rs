@@ -1,6 +1,6 @@
 use clap::Parser;
 use httpserver_config::{Args, Config, create_config_health_router};
-use httpserver_core::{Server, create_health_router};
+use httpserver_core::{Server, create_health_router, initialize_logging, cleanup_old_logs};
 use httpserver_static::{StaticHandler, create_static_health_router};
 use httpserver_proxy::ProxyHandler;
 use httpserver_balancer::create_balancer_health_router;
@@ -22,6 +22,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Create configuration from arguments
     let config = Config::from_args(args)?;
+    
+    // Initialize logging system
+    initialize_logging(&config.logging)?;
+    
+    // Clean up old log files
+    if let Err(e) = cleanup_old_logs(&config.logging) {
+        tracing::warn!(error = %e, "Failed to clean up old log files");
+    }
+    
+    tracing::info!("Application starting");
     
     // Create the static file handler
     let static_handler = StaticHandler::new(config.static_config.directory)?;
@@ -57,16 +67,31 @@ async fn create_router(
     
     // If proxy routes are configured, add proxy middleware with higher priority
     if proxy_handler.has_routes() {
-        println!("Proxy routes configured: {}", proxy_handler.routes().len());
+        tracing::info!(route_count = proxy_handler.routes().len(), "Proxy routes configured");
         for route in proxy_handler.routes() {
             let targets = route.get_targets();
             if targets.len() > 1 {
-                println!("  {} -> {} targets ({})", route.path, targets.len(), route.strategy);
+                tracing::info!(
+                    path = %route.path,
+                    target_count = targets.len(),
+                    strategy = %route.strategy,
+                    "Multi-target route configured"
+                );
                 for (i, target) in targets.iter().enumerate() {
-                    println!("    {}. {} (weight: {})", i + 1, target.url, target.weight);
+                    tracing::debug!(
+                        route = %route.path,
+                        target_index = i + 1,
+                        url = %target.url,
+                        weight = target.weight,
+                        "Route target configured"
+                    );
                 }
             } else if let Some(target_url) = route.get_primary_target() {
-                println!("  {} -> {}", route.path, target_url);
+                tracing::info!(
+                    path = %route.path,
+                    target = %target_url,
+                    "Single-target route configured"
+                );
             }
         }
         
@@ -84,8 +109,8 @@ async fn create_router(
                 proxy_middleware
             ));
         
-        println!("Proxy forwarding active - routes will be processed before static files");
-        println!("Health endpoints available: /health, /ping, /config/health, /static/health, /balancer/health");
+        tracing::info!("Proxy forwarding active - routes will be processed before static files");
+        tracing::info!("Health endpoints available: /health, /ping, /config/health, /static/health, /balancer/health");
         Ok(app)
     } else {
         // No proxy routes, just return static router with health endpoints
@@ -95,7 +120,7 @@ async fn create_router(
             .merge(static_health_router)
             .merge(balancer_health_router);
         
-        println!("Health endpoints available: /health, /ping, /config/health, /static/health, /balancer/health");
+        tracing::info!("Health endpoints available: /health, /ping, /config/health, /static/health, /balancer/health");
         Ok(app)
     }
 }

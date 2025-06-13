@@ -9,6 +9,7 @@ use axum::{
     Json,
 };
 use serde_json::{json, Value};
+use tracing;
 
 /// Health endpoint handler for load balancer service
 pub async fn balancer_health() -> Json<Value> {
@@ -326,8 +327,11 @@ impl LoadBalancer {
         let mut health_status = self.health_status.lock().unwrap();
         health_status.insert(target_url.to_string(), healthy);
         
-        println!("Health status updated for {}: {}", target_url, 
-            if healthy { "HEALTHY" } else { "UNHEALTHY" });
+        tracing::info!(
+            target_url = %target_url,
+            healthy = healthy,
+            "Health status updated for target"
+        );
     }
     
     /// Get all targets

@@ -10,6 +10,11 @@ tower-http = { workspace = true }
 tokio = { workspace = true }
 chrono = { workspace = true }
 serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tracing-appender = { workspace = true }
+uuid = { workspace = true }
+httpserver-config = { path = "../httpserver-config" }
 
 [dev-dependencies]
 reqwest = { version = "0.11", features = ["json"] }

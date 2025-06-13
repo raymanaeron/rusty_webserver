@@ -38,6 +38,10 @@ pub struct Config {
     /// Proxy routes (future feature)
     #[serde(default)]
     pub proxy: Vec<ProxyRoute>,
+    
+    /// Logging configuration
+    #[serde(default)]
+    pub logging: LoggingConfig,
 }
 
 /// Static file serving configuration
@@ -146,6 +150,71 @@ pub struct WebSocketHealthConfig {
     pub ping_message: String,
 }
 
+/// Logging configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoggingConfig {
+    /// Log level (e.g., "debug", "info", "warn", "error")
+    #[serde(default = "default_log_level")]
+    pub level: String,
+    
+    /// Enable file logging
+    #[serde(default = "default_file_logging")]
+    pub file_logging: bool,
+    
+    /// Log directory path (default: "./logs")
+    #[serde(default = "default_logs_directory")]
+    pub logs_directory: PathBuf,
+    
+    /// Log file size limit in MB (default: 1)
+    #[serde(default = "default_file_size_mb")]
+    pub file_size_mb: u64,
+    
+    /// Log retention in days (default: 30)
+    #[serde(default = "default_retention_days")]
+    pub retention_days: u32,
+    
+    /// Log format ("json" or "text", default: "text")
+    #[serde(default = "default_log_format")]
+    pub format: String,
+}
+
+impl Default for LoggingConfig {
+    fn default() -> Self {
+        Self {
+            level: default_log_level(),
+            file_logging: default_file_logging(),
+            logs_directory: default_logs_directory(),
+            file_size_mb: default_file_size_mb(),
+            retention_days: default_retention_days(),
+            format: default_log_format(),
+        }
+    }
+}
+
+fn default_log_level() -> String {
+    "info".to_string()
+}
+
+fn default_file_logging() -> bool {
+    true
+}
+
+fn default_logs_directory() -> PathBuf {
+    PathBuf::from("./logs")
+}
+
+fn default_file_size_mb() -> u64 {
+    1 // 1 MB
+}
+
+fn default_retention_days() -> u32 {
+    30 // 30 days
+}
+
+fn default_log_format() -> String {
+    "text".to_string()
+}
+
 impl Default for Config {
     fn default() -> Self {
         Self {
@@ -154,6 +223,7 @@ impl Default for Config {
                 fallback: "index.html".to_string(),
             },
             proxy: Vec::new(),
+            logging: LoggingConfig::default(),
         }
     }
 }

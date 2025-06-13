@@ -11,6 +11,11 @@ use std::net::SocketAddr;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
 use serde_json::json;
+use tracing::{info, error, instrument, Instrument};
+
+// Export logging functionality
+pub mod logging;
+pub use logging::{initialize_logging, create_request_span, check_log_rotation, cleanup_old_logs};
 
 /// Core server functionality
 pub struct Server {
@@ -23,8 +28,9 @@ impl Server {
     }
 
     /// Start the HTTP server with the given router
+    #[instrument(skip(self, app), fields(port = self.port))]
     pub async fn start(self, app: Router) -> Result<(), Box<dyn std::error::Error>> {
-        println!("Starting HTTP server on port {}", self.port);
+        info!(port = self.port, "Starting HTTP server");
 
         // Apply middleware to the router
         let app = app.layer(
@@ -36,15 +42,15 @@ impl Server {
         let listener = match tokio::net::TcpListener::bind(format!("0.0.0.0:{}", self.port)).await {
             Ok(listener) => listener,
             Err(e) => {
-                eprintln!("Error: Failed to bind to port {}: {}", self.port, e);
+                error!(port = self.port, error = %e, "Failed to bind to port");
                 std::process::exit(1);
             }
         };
 
-        println!("Server running at http://localhost:{}", self.port);
+        info!(port = self.port, "Server running at http://localhost:{}", self.port);
 
         if let Err(e) = axum::serve(listener, app.into_make_service_with_connect_info::<SocketAddr>()).await {
-            eprintln!("Server error: {}", e);
+            error!(error = %e, "Server error");
             std::process::exit(1);
         }
 
@@ -60,25 +66,36 @@ pub async fn logging_middleware(
 ) -> Response {
     let method = req.method().clone();
     let uri = req.uri().clone();
+    let path = uri.path();
+    let client_ip = addr.ip().to_string();
     
-    // Call the next middleware/handler
-    let response = next.run(req).await;
+    // Create request span for tracing
+    let span = create_request_span(&method.to_string(), path, &client_ip);
     
-    let status = response.status();
-    let timestamp = Utc::now().format("%Y-%m-%d %H:%M:%S UTC");
-    
-    // Log in ngrok-style format: Timestamp | IP | Method URL | Status Code Status Text
-    println!(
-        "{} | {} | {} {} | {} {}",
-        timestamp,
-        addr.ip(),
-        method,
-        uri,
-        status.as_u16(),
-        status.canonical_reason().unwrap_or("Unknown")
-    );
-    
-    response
+    async move {
+        let start_time = std::time::Instant::now();
+        
+        // Call the next middleware/handler
+        let response = next.run(req).await;
+        
+        let duration = start_time.elapsed();
+        let status = response.status();
+        
+        // Log request with structured data
+        info!(
+            method = %method,
+            path = %path,
+            client_ip = %client_ip,
+            status_code = status.as_u16(),
+            status_text = status.canonical_reason().unwrap_or("Unknown"),
+            duration_ms = duration.as_millis(),
+            "Request completed"
+        );
+        
+        response
+    }
+    .instrument(span)
+    .await
 }
 
 /// Gateway health endpoint handler

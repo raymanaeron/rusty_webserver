@@ -3,6 +3,7 @@ use std::time::Duration;
 use tokio::time::timeout;
 use reqwest;
 use httpserver_config::HttpHealthConfig;
+use tracing;
 
 /// HTTP health checker using GET requests
 pub struct HttpHealthChecker {
@@ -18,25 +19,41 @@ impl HttpHealthChecker {
             .unwrap_or_else(|_| reqwest::Client::new());
             
         Self { config, client }
-    }
-
-    /// Check if an HTTP target is healthy via GET request
+    }    /// Check if an HTTP target is healthy via GET request
+    #[tracing::instrument(skip(self), fields(timeout = self.config.timeout))]
     pub async fn check_health(&self, target_url: &str) -> bool {
         let health_url = format!("{}{}", target_url, self.config.path);
+
+        tracing::debug!(
+            target_url = %target_url,
+            health_url = %health_url,
+            timeout = self.config.timeout,
+            "Starting HTTP health check"
+        );
 
         match timeout(
             Duration::from_secs(self.config.timeout),
             self.perform_health_check(&health_url)
         ).await {
-            Ok(result) => result,
+            Ok(result) => {
+                tracing::debug!(
+                    health_url = %health_url,
+                    result = result,
+                    "HTTP health check completed"
+                );
+                result
+            },
             Err(_) => {
-                eprintln!("HTTP health check timeout for {}", health_url);
+                tracing::warn!(
+                    health_url = %health_url,
+                    timeout = self.config.timeout,
+                    "HTTP health check timeout"
+                );
                 false
             }
         }
-    }
-
-    /// Perform the actual HTTP health check
+    }    /// Perform the actual HTTP health check
+    #[tracing::instrument(skip(self))]
     async fn perform_health_check(&self, health_url: &str) -> bool {
         match self.client.get(health_url).send().await {
             Ok(response) => {
@@ -44,15 +61,27 @@ impl HttpHealthChecker {
                 let is_healthy = status.is_success() || status == 200;
                 
                 if is_healthy {
-                    println!("HTTP health check OK for {}: {}", health_url, status);
+                    tracing::info!(
+                        health_url = %health_url,
+                        status = %status,
+                        "HTTP health check OK"
+                    );
                 } else {
-                    eprintln!("HTTP health check failed for {}: {}", health_url, status);
+                    tracing::warn!(
+                        health_url = %health_url,
+                        status = %status,
+                        "HTTP health check failed"
+                    );
                 }
                 
                 is_healthy
             }
             Err(e) => {
-                eprintln!("Failed to perform HTTP health check for {}: {}", health_url, e);
+                tracing::error!(
+                    health_url = %health_url,
+                    error = %e,
+                    "Failed to perform HTTP health check"
+                );
                 false
             }
         }

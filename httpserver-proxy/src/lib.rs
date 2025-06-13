@@ -8,6 +8,8 @@ use axum_tungstenite::{Message, WebSocket, WebSocketUpgrade};
 use tokio_tungstenite::{connect_async, tungstenite::protocol::Message as TungsteniteMessage};
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use std::{net::SocketAddr, time::Duration, collections::HashMap};
+use tracing;
+use uuid::Uuid;
 
 // Re-export types from dependencies
 pub use httpserver_config::{ProxyRoute, Target, LoadBalancingStrategy, WebSocketHealthConfig, HttpHealthConfig};
@@ -320,7 +322,12 @@ impl ProxyHandler {
                 // Return the WebSocket upgrade response directly - this works despite type mismatch warnings
                 let upgrade_response = ws.on_upgrade(move |socket| async move {
                     if let Err(e) = proxy_websocket(socket, &ws_target_url, client_ip).await {
-                        eprintln!("WebSocket proxy error: {}", e);
+                        tracing::error!(
+                            error = %e,
+                            target_url = %ws_target_url,
+                            client_ip = %client_ip,
+                            "WebSocket proxy error"
+                        );
                     }
                 });
                 
@@ -653,12 +660,17 @@ impl IntoResponse for ProxyError {
 }
 
 /// Proxy a WebSocket connection between client and backend
+#[tracing::instrument(skip(client_socket), fields(request_id = %Uuid::new_v4()))]
 async fn proxy_websocket(
     client_socket: WebSocket,
     target_url: &str,
     client_ip: SocketAddr,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    println!("WebSocket proxy: {} -> {}", client_ip, target_url);
+    tracing::info!(
+        client_ip = %client_ip,
+        target_url = %target_url,
+        "WebSocket proxy connection established"
+    );
     
     // Connect to the backend WebSocket server
     let (backend_stream, _) = connect_async(target_url).await?;
@@ -672,30 +684,35 @@ async fn proxy_websocket(
         while let Some(msg) = client_stream.next().await {
             match msg {
                 Ok(Message::Text(text)) => {
+                    tracing::debug!(message_type = "text", size = text.len(), "Forwarding message to backend");
                     if let Err(e) = backend_sink.send(TungsteniteMessage::Text(text)).await {
-                        eprintln!("Error forwarding text to backend: {}", e);
+                        tracing::error!(error = %e, "Error forwarding text to backend");
                         break;
                     }
                 }
                 Ok(Message::Binary(data)) => {
+                    tracing::debug!(message_type = "binary", size = data.len(), "Forwarding message to backend");
                     if let Err(e) = backend_sink.send(TungsteniteMessage::Binary(data)).await {
-                        eprintln!("Error forwarding binary to backend: {}", e);
+                        tracing::error!(error = %e, "Error forwarding binary to backend");
                         break;
                     }
                 }
                 Ok(Message::Close(_)) => {
+                    tracing::info!("Client initiated WebSocket close");
                     let _ = backend_sink.send(TungsteniteMessage::Close(None)).await;
                     break;
                 }
                 Ok(Message::Ping(data)) => {
+                    tracing::debug!(size = data.len(), "Forwarding ping to backend");
                     if let Err(e) = backend_sink.send(TungsteniteMessage::Ping(data)).await {
-                        eprintln!("Error forwarding ping to backend: {}", e);
+                        tracing::error!(error = %e, "Error forwarding ping to backend");
                         break;
                     }
                 }
                 Ok(Message::Pong(data)) => {
+                    tracing::debug!(size = data.len(), "Forwarding pong to backend");
                     if let Err(e) = backend_sink.send(TungsteniteMessage::Pong(data)).await {
-                        eprintln!("Error forwarding pong to backend: {}", e);
+                        tracing::error!(error = %e, "Error forwarding pong to backend");
                         break;
                     }
                 }
@@ -703,7 +720,7 @@ async fn proxy_websocket(
                     // Frame messages are typically handled automatically
                 }
                 Err(e) => {
-                    eprintln!("Error receiving from client: {}", e);
+                    tracing::error!(error = %e, "Error receiving from client");
                     break;
                 }
             }
@@ -715,30 +732,35 @@ async fn proxy_websocket(
         while let Some(msg) = backend_stream.next().await {
             match msg {
                 Ok(TungsteniteMessage::Text(text)) => {
+                    tracing::debug!(message_type = "text", size = text.len(), "Forwarding message to client");
                     if let Err(e) = client_sink.send(Message::Text(text)).await {
-                        eprintln!("Error forwarding text to client: {}", e);
+                        tracing::error!(error = %e, "Error forwarding text to client");
                         break;
                     }
                 }
                 Ok(TungsteniteMessage::Binary(data)) => {
+                    tracing::debug!(message_type = "binary", size = data.len(), "Forwarding message to client");
                     if let Err(e) = client_sink.send(Message::Binary(data)).await {
-                        eprintln!("Error forwarding binary to client: {}", e);
+                        tracing::error!(error = %e, "Error forwarding binary to client");
                         break;
                     }
                 }
                 Ok(TungsteniteMessage::Close(_)) => {
+                    tracing::info!("Backend initiated WebSocket close");
                     let _ = client_sink.send(Message::Close(None)).await;
                     break;
                 }
                 Ok(TungsteniteMessage::Ping(data)) => {
+                    tracing::debug!(size = data.len(), "Forwarding ping to client");
                     if let Err(e) = client_sink.send(Message::Ping(data)).await {
-                        eprintln!("Error forwarding ping to client: {}", e);
+                        tracing::error!(error = %e, "Error forwarding ping to client");
                         break;
                     }
                 }
                 Ok(TungsteniteMessage::Pong(data)) => {
+                    tracing::debug!(size = data.len(), "Forwarding pong to client");
                     if let Err(e) = client_sink.send(Message::Pong(data)).await {
-                        eprintln!("Error forwarding pong to client: {}", e);
+                        tracing::error!(error = %e, "Error forwarding pong to client");
                         break;
                     }
                 }
@@ -746,7 +768,7 @@ async fn proxy_websocket(
                     // Frame messages are typically handled automatically
                 }
                 Err(e) => {
-                    eprintln!("Error receiving from backend: {}", e);
+                    tracing::error!(error = %e, "Error receiving from backend");
                     break;
                 }
             }
@@ -756,10 +778,10 @@ async fn proxy_websocket(
     // Wait for either task to complete (connection closed or error)
     tokio::select! {
         _ = client_to_backend => {
-            println!("Client to backend connection closed");
+            tracing::info!("Client to backend connection closed");
         }
         _ = backend_to_client => {
-            println!("Backend to client connection closed");
+            tracing::info!("Backend to client connection closed");
         }
     }
     

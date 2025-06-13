@@ -4,6 +4,7 @@ use tokio::time::timeout;
 use tokio_tungstenite::{connect_async, tungstenite::Message as TungsteniteMessage};
 use futures_util::{SinkExt, StreamExt};
 use httpserver_config::WebSocketHealthConfig;
+use tracing;
 
 /// WebSocket health checker
 pub struct WebSocketHealthChecker {
@@ -13,65 +14,109 @@ pub struct WebSocketHealthChecker {
 impl WebSocketHealthChecker {
     pub fn new(config: WebSocketHealthConfig) -> Self {
         Self { config }
-    }
-
-    /// Check if a WebSocket target is healthy
+    }    /// Check if a WebSocket target is healthy
+    #[tracing::instrument(skip(self), fields(timeout = self.config.timeout))]
     pub async fn check_health(&self, target_url: &str) -> bool {
         // Convert HTTP URL to WebSocket URL for health check
         let ws_url = self.convert_to_websocket_url(target_url);
         let health_url = format!("{}{}", ws_url, self.config.path);
 
+        tracing::debug!(
+            target_url = %target_url,
+            health_url = %health_url,
+            timeout = self.config.timeout,
+            "Starting WebSocket health check"
+        );
+
         match timeout(
             Duration::from_secs(self.config.timeout),
             self.perform_health_check(&health_url)
         ).await {
-            Ok(result) => result,
+            Ok(result) => {
+                tracing::debug!(
+                    health_url = %health_url,
+                    result = result,
+                    "WebSocket health check completed"
+                );
+                result
+            },
             Err(_) => {
-                eprintln!("WebSocket health check timeout for {}", health_url);
+                tracing::warn!(
+                    health_url = %health_url,
+                    timeout = self.config.timeout,
+                    "WebSocket health check timeout"
+                );
                 false
             }
         }
-    }
-
-    /// Perform the actual WebSocket health check
+    }    /// Perform the actual WebSocket health check
+    #[tracing::instrument(skip(self))]
     async fn perform_health_check(&self, ws_url: &str) -> bool {
         match connect_async(ws_url).await {
             Ok((mut ws_stream, _)) => {
+                tracing::debug!(
+                    ws_url = %ws_url,
+                    ping_message = %self.config.ping_message,
+                    "WebSocket connection established, sending ping"
+                );
+
                 // Send ping message
                 if let Err(e) = ws_stream.send(TungsteniteMessage::Text(self.config.ping_message.clone())).await {
-                    eprintln!("Failed to send WebSocket ping to {}: {}", ws_url, e);
+                    tracing::error!(
+                        ws_url = %ws_url,
+                        error = %e,
+                        "Failed to send WebSocket ping"
+                    );
                     return false;
                 }
 
                 // Wait for pong or any response
                 match ws_stream.next().await {
                     Some(Ok(TungsteniteMessage::Text(response))) => {
-                        // Consider any text response as healthy
-                        println!("WebSocket health check OK for {}: {}", ws_url, response);
+                        tracing::info!(
+                            ws_url = %ws_url,
+                            response = %response,
+                            "WebSocket health check OK (text response)"
+                        );
                         true
                     }
                     Some(Ok(TungsteniteMessage::Pong(_))) => {
-                        // Direct pong response
-                        println!("WebSocket health check OK for {} (pong)", ws_url);
+                        tracing::info!(
+                            ws_url = %ws_url,
+                            "WebSocket health check OK (pong response)"
+                        );
                         true
                     }
                     Some(Ok(_)) => {
-                        // Any other message type is considered healthy
-                        println!("WebSocket health check OK for {} (other message)", ws_url);
+                        tracing::info!(
+                            ws_url = %ws_url,
+                            "WebSocket health check OK (other message type)"
+                        );
                         true
                     }
                     Some(Err(e)) => {
-                        eprintln!("WebSocket health check error for {}: {}", ws_url, e);
+                        tracing::error!(
+                            ws_url = %ws_url,
+                            error = %e,
+                            "WebSocket health check error"
+                        );
                         false
                     }
                     None => {
-                        eprintln!("WebSocket health check: no response from {}", ws_url);
+                        tracing::warn!(
+                            ws_url = %ws_url,
+                            "WebSocket health check: no response received"
+                        );
                         false
                     }
                 }
             }
             Err(e) => {
-                eprintln!("Failed to connect to WebSocket for health check {}: {}", ws_url, e);
+                tracing::error!(
+                    ws_url = %ws_url,
+                    error = %e,
+                    "Failed to connect to WebSocket for health check"
+                );
                 false
             }
         }
