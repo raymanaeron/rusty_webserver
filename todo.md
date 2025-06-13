@@ -278,12 +278,30 @@ rusty_webserver/
 **All compilation issues resolved and 90/90 tests passing (excluding 3 unrelated static file tests)**
 
 ### 4.2 Enhanced Logging (EASIEST)
-- [ ] **Proxy request logging** - Log proxy requests with target info
-- [ ] **Health check logging** - Log health check results
-- [ ] **Performance metrics** - Response times, error rates
-- [ ] **Load balancer stats** - Target selection and distribution stats
-- [ ] **WebSocket logging** - Log WebSocket connections and upgrades
+- [ ] **Structured logging framework** - Replace all `println!` with proper log levels (`debug!`, `info!`, `warn!`, `error!`)
+- [ ] **File-based logging** - Log to files in `./logs/` directory with automatic creation
+- [ ] **Log rotation** - Configurable file size limit (default 1MB) with automatic rotation
+- [ ] **Log level configuration** - Configurable log levels per module via config.toml
+- [ ] **Proxy request logging** - Log proxy requests with method, path, target, client IP, duration
+- [ ] **Health check logging** - Log health check results with target status and response times
+- [ ] **Performance metrics** - Response times, error rates, request/response sizes
+- [ ] **Load balancer stats** - Target selection, strategy used, connection counts, failures
+- [ ] **WebSocket logging** - Log WebSocket connections, upgrades, ping/pong, disconnections
+- [ ] **Static file logging** - Log static file requests with path, size, cache status
+- [ ] **Configuration logging** - Log config loading, validation errors, route registration
+- [ ] **Error tracing** - Full error context with request IDs for traceability
+- [ ] **Log format standardization** - Structured JSON or key-value format for parsing
 - [ ] **Test organization** - Separate test files for logging functionality
+
+**Implementation Details:**
+- Use `tracing` crate for structured logging with spans and events
+- Use `tracing-subscriber` for file output and log rotation
+- Use `tracing-appender` for file rotation based on size limits
+- Add `log_config` section to config.toml with level, file_size_mb, retention_days
+- Generate unique request IDs for full request traceability
+- Replace all existing `println!` statements across all crates
+- Add logging middleware for automatic request/response logging
+- Include structured fields: timestamp, level, module, request_id, duration, etc.
 
 ### 4.3 Circuit Breaker Pattern (MEDIUM)
 - [ ] **Failure tracking** - Track consecutive failures per target
