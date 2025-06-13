@@ -277,15 +277,7 @@ rusty_webserver/
 
 **All compilation issues resolved and 90/90 tests passing (excluding 3 unrelated static file tests)**
 
-### 4.2 Circuit Breaker Pattern
-- [ ] **Failure tracking** - Track consecutive failures per target
-- [ ] **Circuit states** - Closed, Open, Half-Open states
-- [ ] **Failure thresholds** - Configurable failure limits
-- [ ] **Recovery testing** - Half-open state for testing recovery
-- [ ] **Timeout configuration** - Circuit breaker timeout settings
-- [ ] **Test organization** - Separate test files for circuit breaker functionality
-
-### 4.3 Enhanced Logging
+### 4.2 Enhanced Logging (EASIEST)
 - [ ] **Proxy request logging** - Log proxy requests with target info
 - [ ] **Health check logging** - Log health check results
 - [ ] **Performance metrics** - Response times, error rates
@@ -293,7 +285,15 @@ rusty_webserver/
 - [ ] **WebSocket logging** - Log WebSocket connections and upgrades
 - [ ] **Test organization** - Separate test files for logging functionality
 
-### 4.4 SSL/TLS Support
+### 4.3 Circuit Breaker Pattern (MEDIUM)
+- [ ] **Failure tracking** - Track consecutive failures per target
+- [ ] **Circuit states** - Closed, Open, Half-Open states
+- [ ] **Failure thresholds** - Configurable failure limits
+- [ ] **Recovery testing** - Half-open state for testing recovery
+- [ ] **Timeout configuration** - Circuit breaker timeout settings
+- [ ] **Test organization** - Separate test files for circuit breaker functionality
+
+### 4.4 SSL/TLS Support (HARDEST)
 - [ ] **SSL termination** - Handle HTTPS at the gateway, forward HTTP to backends
 - [ ] **Certificate management** - Load cert/key files from filesystem
 - [ ] **HTTP to HTTPS redirect** - Automatic redirect for SSL-enabled routes
