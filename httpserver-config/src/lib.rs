@@ -190,10 +190,6 @@ pub struct LoggingConfig {
     #[serde(default = "default_output_mode")]
     pub output_mode: String,
     
-    /// Log file pattern with placeholders
-    #[serde(default = "default_file_pattern")]
-    pub file_pattern: String,
-    
     /// Enable structured logging with additional fields
     #[serde(default = "default_structured_logging")]
     pub structured_logging: bool,
@@ -205,18 +201,6 @@ pub struct LoggingConfig {
     /// Enable performance metrics logging
     #[serde(default = "default_enable_performance_metrics")]
     pub enable_performance_metrics: bool,
-    
-    /// Log rotation strategy ("size", "daily", "hourly")
-    #[serde(default = "default_rotation_strategy")]
-    pub rotation_strategy: String,
-    
-    /// Compression for rotated logs
-    #[serde(default = "default_compress_rotated_logs")]
-    pub compress_rotated_logs: bool,
-    
-    /// Maximum number of rotated log files to keep
-    #[serde(default = "default_max_rotated_files")]
-    pub max_rotated_files: u32,
 }
 
 impl Default for LoggingConfig {
@@ -229,13 +213,9 @@ impl Default for LoggingConfig {
             retention_days: default_retention_days(),
             format: default_log_format(),
             output_mode: default_output_mode(),
-            file_pattern: default_file_pattern(),
             structured_logging: default_structured_logging(),
             enable_request_ids: default_enable_request_ids(),
             enable_performance_metrics: default_enable_performance_metrics(),
-            rotation_strategy: default_rotation_strategy(),
-            compress_rotated_logs: default_compress_rotated_logs(),
-            max_rotated_files: default_max_rotated_files(),
         }
     }
 }
@@ -268,10 +248,6 @@ fn default_output_mode() -> String {
     "both".to_string()
 }
 
-fn default_file_pattern() -> String {
-    "httpserver_{date}.log".to_string()
-}
-
 fn default_structured_logging() -> bool {
     true
 }
@@ -282,18 +258,6 @@ fn default_enable_request_ids() -> bool {
 
 fn default_enable_performance_metrics() -> bool {
     true
-}
-
-fn default_rotation_strategy() -> String {
-    "size".to_string()
-}
-
-fn default_compress_rotated_logs() -> bool {
-    true
-}
-
-fn default_max_rotated_files() -> u32 {
-    5
 }
 
 impl Default for Config {

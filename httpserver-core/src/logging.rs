@@ -76,9 +76,7 @@ pub fn initialize_logging(config: &LoggingConfig) -> Result<(), Box<dyn std::err
         subscriber
             .with(file_layer)
             .with(console_layer)
-            .init();
-
-        tracing::info!(
+            .init();        tracing::info!(
             logs_directory = %config.logs_directory.display(),
             level = %config.level,
             format = %config.format,
@@ -86,7 +84,6 @@ pub fn initialize_logging(config: &LoggingConfig) -> Result<(), Box<dyn std::err
             structured_logging = config.structured_logging,
             enable_request_ids = config.enable_request_ids,
             enable_performance_metrics = config.enable_performance_metrics,
-            rotation_strategy = %config.rotation_strategy,
             "Logging initialized with both file and console output"
         );
     } else if enable_file {

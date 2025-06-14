@@ -22,20 +22,14 @@ fn ensure_logging_initialized() {
 fn test_logging_config_defaults() {
     let config = LoggingConfig::default();
     
-    assert_eq!(config.level, "info");
-    assert_eq!(config.file_logging, true);
+    assert_eq!(config.level, "info");    assert_eq!(config.file_logging, true);
     assert_eq!(config.logs_directory, PathBuf::from("./logs"));
     assert_eq!(config.file_size_mb, 10);
     assert_eq!(config.retention_days, 30);
     assert_eq!(config.format, "text");
-    assert_eq!(config.output_mode, "both");
-    assert_eq!(config.file_pattern, "httpserver_{date}.log");
-    assert_eq!(config.structured_logging, true);
+    assert_eq!(config.output_mode, "both");    assert_eq!(config.structured_logging, true);
     assert_eq!(config.enable_request_ids, true);
     assert_eq!(config.enable_performance_metrics, true);
-    assert_eq!(config.rotation_strategy, "size");
-    assert_eq!(config.compress_rotated_logs, true);
-    assert_eq!(config.max_rotated_files, 5);
 }
 
 #[test]
