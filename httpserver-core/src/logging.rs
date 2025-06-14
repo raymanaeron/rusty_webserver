@@ -39,7 +39,13 @@ pub fn initialize_logging(config: &LoggingConfig) -> Result<(), Box<dyn std::err
             .filename_suffix("log")
             .build(&config.logs_directory)?;
 
-        let (non_blocking_appender, _guard) = non_blocking(file_appender);        // Add file logging layer (NO ANSI colors for file output)
+        let (non_blocking_appender, guard) = non_blocking(file_appender);
+        
+        // Keep the guard alive for the entire program duration
+        // This is necessary to prevent the file logging from stopping
+        std::mem::forget(guard);
+        
+        // Add file logging layer (NO ANSI colors for file output)
         let file_layer = if config.format == "json" {
             fmt::layer()
                 .json()
@@ -91,7 +97,13 @@ pub fn initialize_logging(config: &LoggingConfig) -> Result<(), Box<dyn std::err
             .filename_suffix("log")
             .build(&config.logs_directory)?;
 
-        let (non_blocking_appender, _guard) = non_blocking(file_appender);        let file_layer = if config.format == "json" {
+        let (non_blocking_appender, guard) = non_blocking(file_appender);
+        
+        // Keep the guard alive for the entire program duration
+        // This is necessary to prevent the file logging from stopping
+        std::mem::forget(guard);
+        
+        let file_layer = if config.format == "json" {
             fmt::layer()
                 .json()
                 .with_ansi(false)  // Disable ANSI colors for file output
