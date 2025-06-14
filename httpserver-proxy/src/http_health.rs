@@ -13,13 +13,15 @@ pub struct HttpHealthChecker {
 
 impl HttpHealthChecker {
     pub fn new(config: HttpHealthConfig) -> Self {
-        let client = reqwest::Client::builder()
+        let client = reqwest::Client
+            ::builder()
             .timeout(Duration::from_secs(config.timeout))
             .build()
             .unwrap_or_else(|_| reqwest::Client::new());
-            
+
         Self { config, client }
-    }    /// Check if an HTTP target is healthy via GET request
+    }
+    /// Check if an HTTP target is healthy via GET request
     #[tracing::instrument(skip(self), fields(timeout = self.config.timeout))]
     pub async fn check_health(&self, target_url: &str) -> bool {
         let health_url = format!("{}{}", target_url, self.config.path);
@@ -31,10 +33,12 @@ impl HttpHealthChecker {
             "Starting HTTP health check"
         );
 
-        match timeout(
-            Duration::from_secs(self.config.timeout),
-            self.perform_health_check(&health_url)
-        ).await {
+        match
+            timeout(
+                Duration::from_secs(self.config.timeout),
+                self.perform_health_check(&health_url)
+            ).await
+        {
             Ok(result) => {
                 tracing::debug!(
                     health_url = %health_url,
@@ -42,7 +46,7 @@ impl HttpHealthChecker {
                     "HTTP health check completed"
                 );
                 result
-            },
+            }
             Err(_) => {
                 tracing::warn!(
                     health_url = %health_url,
@@ -52,14 +56,15 @@ impl HttpHealthChecker {
                 false
             }
         }
-    }    /// Perform the actual HTTP health check
+    }
+    /// Perform the actual HTTP health check
     #[tracing::instrument(skip(self))]
     async fn perform_health_check(&self, health_url: &str) -> bool {
         match self.client.get(health_url).send().await {
             Ok(response) => {
                 let status = response.status();
                 let is_healthy = status.is_success() || status == 200;
-                
+
                 if is_healthy {
                     tracing::info!(
                         health_url = %health_url,
@@ -73,7 +78,7 @@ impl HttpHealthChecker {
                         "HTTP health check failed"
                     );
                 }
-                
+
                 is_healthy
             }
             Err(e) => {
@@ -103,9 +108,11 @@ impl HttpHealthMonitor {
     }
 
     /// Start background health monitoring with callback for health status updates
-    pub async fn start_monitoring_with_callback<F>(&self, health_callback: F) -> tokio::task::JoinHandle<()>
-    where
-        F: Fn(&str, bool) + Send + Sync + 'static,
+    pub async fn start_monitoring_with_callback<F>(
+        &self,
+        health_callback: F
+    ) -> tokio::task::JoinHandle<()>
+        where F: Fn(&str, bool) + Send + Sync + 'static
     {
         let checker = HttpHealthChecker::new(self.checker.config.clone());
         let targets = self.targets.clone();
@@ -113,17 +120,18 @@ impl HttpHealthMonitor {
 
         tokio::spawn(async move {
             let mut interval_timer = tokio::time::interval(interval);
-            
+
             loop {
                 interval_timer.tick().await;
-                
+
                 for target in &targets {
                     let is_healthy = checker.check_health(target).await;
-                    println!("HTTP health check for {}: {}", 
-                        target, 
-                        if is_healthy { "HEALTHY" } else { "UNHEALTHY" }
-                    );
-                    
+                    println!("HTTP health check for {}: {}", target, if is_healthy {
+                        "HEALTHY"
+                    } else {
+                        "UNHEALTHY"
+                    });
+
                     // Update load balancer target health status via callback
                     health_callback(target, is_healthy);
                 }
@@ -134,10 +142,11 @@ impl HttpHealthMonitor {
     /// Start background health monitoring (legacy method for backward compatibility)
     pub async fn start_monitoring(&self) -> tokio::task::JoinHandle<()> {
         self.start_monitoring_with_callback(|target, is_healthy| {
-            println!("HTTP health update for {}: {}", 
-                target, 
-                if is_healthy { "HEALTHY" } else { "UNHEALTHY" }
-            );
+            println!("HTTP health update for {}: {}", target, if is_healthy {
+                "HEALTHY"
+            } else {
+                "UNHEALTHY"
+            });
         }).await
     }
 }

@@ -1,10 +1,10 @@
-use httpserver_balancer::{LoadBalancer, LoadBalancingStrategy, Target};
+use httpserver_balancer::{ LoadBalancer, LoadBalancingStrategy, Target };
 
 fn create_test_targets() -> Vec<Target> {
     vec![
         Target::new("http://localhost:3000".to_string()),
         Target::new("http://localhost:3001".to_string()),
-        Target::new("http://localhost:3002".to_string()),
+        Target::new("http://localhost:3002".to_string())
     ]
 }
 

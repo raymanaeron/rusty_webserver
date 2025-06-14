@@ -1,8 +1,8 @@
 // Simple WebSocket server for testing end-to-end functionality
-use tokio_tungstenite::{accept_async, tungstenite::Message};
-use futures_util::{SinkExt, StreamExt};
+use tokio_tungstenite::{ accept_async, tungstenite::Message };
+use futures_util::{ SinkExt, StreamExt };
 use std::net::SocketAddr;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::{ TcpListener, TcpStream };
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,17 +19,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
     println!("New WebSocket connection from: {}", addr);
-    
+
     match accept_async(raw_stream).await {
         Ok(ws_stream) => {
             let (mut ws_sender, mut ws_receiver) = ws_stream.split();
-            
+
             // Echo server - send back any message received
             while let Some(msg) = ws_receiver.next().await {
                 match msg {
                     Ok(Message::Text(text)) => {
                         println!("Received text: {}", text);
-                        
+
                         // Handle health check ping
                         if text == "ping" {
                             if let Err(e) = ws_sender.send(Message::Text("pong".to_string())).await {
@@ -78,6 +78,6 @@ async fn handle_connection(raw_stream: TcpStream, addr: SocketAddr) {
             println!("Error during WebSocket handshake: {}", e);
         }
     }
-    
+
     println!("Connection with {} ended", addr);
 }

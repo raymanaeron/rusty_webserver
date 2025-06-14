@@ -16,9 +16,19 @@ tracing-appender = { workspace = true }
 uuid = { workspace = true }
 httpserver-config = { path = "../httpserver-config" }
 
+# Phase 6.1 - SSL/TLS Support
+rustls = { workspace = true }
+tokio-rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
+hyper = { workspace = true }
+hyper-util = { workspace = true }
+
 [dev-dependencies]
 reqwest = { version = "0.11", features = ["json"] }
 hyper = { version = "1.0", features = ["full"] }
+hyper-util = { version = "0.1", features = ["full"] }
+tempfile = "3.0"
+rcgen = "0.12"
 
 [lib]
 name = "httpserver_core"

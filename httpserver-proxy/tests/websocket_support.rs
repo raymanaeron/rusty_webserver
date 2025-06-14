@@ -1,35 +1,39 @@
 use httpserver_proxy::ProxyHandler;
-use httpserver_config::{ProxyRoute, LoadBalancingStrategy};
+use httpserver_config::{ ProxyRoute, LoadBalancingStrategy };
 use httpserver_balancer::Target;
-use axum::{extract::Request, body::Body};
+use axum::{ extract::Request, body::Body };
 
 fn create_test_proxy_handler() -> ProxyHandler {
-    let routes = vec![        ProxyRoute {
+    let routes = vec![
+        ProxyRoute {
             path: "/ws/*".to_string(),
             targets: vec![
                 Target::new("http://localhost:8001".to_string()),
-                Target::new("http://localhost:8002".to_string()),
+                Target::new("http://localhost:8002".to_string())
             ],
             target: None,
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 30,
             sticky_sessions: false,
-            http_health: None,            websocket_health: None,
+            http_health: None,
+            websocket_health: None,
             circuit_breaker: None,
             middleware: None,
-        },        ProxyRoute {
+        },
+        ProxyRoute {
             path: "/api/websocket".to_string(),
             targets: vec![],
             target: Some("http://localhost:9000".to_string()),
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 30,
             sticky_sessions: false,
-            http_health: None,            websocket_health: None,
+            http_health: None,
+            websocket_health: None,
             circuit_breaker: None,
             middleware: None,
-        },
+        }
     ];
-    
+
     ProxyHandler::new(routes)
 }
 
@@ -44,7 +48,7 @@ fn test_websocket_detection() {
         .header("sec-websocket-key", "dGhlIHNhbXBsZSBub25jZQ==")
         .body(Body::empty())
         .unwrap();
-    
+
     assert!(ProxyHandler::is_websocket_request(&request));
 }
 
@@ -56,27 +60,27 @@ fn test_non_websocket_detection() {
         .header("content-type", "application/json")
         .body(Body::empty())
         .unwrap();
-    
+
     assert!(!ProxyHandler::is_websocket_request(&request));
 }
 
 #[test]
 fn test_websocket_route_matching() {
     let handler = create_test_proxy_handler();
-    
+
     // Test wildcard WebSocket route matching
     let route_match = handler.find_route("/ws/chat/room1");
     assert!(route_match.is_some());
-    
+
     let route_match = route_match.unwrap();
     assert_eq!(route_match.route.path, "/ws/*");
     assert_eq!(route_match.stripped_path, "/chat/room1");
     assert!(route_match.is_wildcard);
-    
+
     // Test exact WebSocket route matching
     let exact_match = handler.find_route("/api/websocket");
     assert!(exact_match.is_some());
-    
+
     let exact_match = exact_match.unwrap();
     assert_eq!(exact_match.route.path, "/api/websocket");
     assert_eq!(exact_match.stripped_path, "");
@@ -86,7 +90,7 @@ fn test_websocket_route_matching() {
 #[test]
 fn test_websocket_load_balancing() {
     let handler = create_test_proxy_handler();
-    
+
     // Test that WebSocket routes can use load balancing
     let route_match = handler.find_route("/ws/notifications").unwrap();
     let targets = route_match.route.get_targets();
@@ -105,18 +109,18 @@ fn test_websocket_headers_parsing() {
         .header("Upgrade", "WebSocket") // Capital W and S
         .body(Body::empty())
         .unwrap();
-    
+
     assert!(ProxyHandler::is_websocket_request(&request));
-    
+
     // Test with connection header containing multiple values
     let request2 = Request::builder()
-        .method("GET") 
+        .method("GET")
         .uri("/ws/test")
         .header("connection", "keep-alive, upgrade")
         .header("upgrade", "websocket")
         .body(Body::empty())
         .unwrap();
-    
+
     assert!(ProxyHandler::is_websocket_request(&request2));
 }
 
@@ -129,9 +133,9 @@ fn test_invalid_websocket_headers() {
         .header("connection", "upgrade")
         .body(Body::empty())
         .unwrap();
-    
+
     assert!(!ProxyHandler::is_websocket_request(&request1));
-    
+
     // Wrong upgrade value
     let request2 = Request::builder()
         .method("GET")
@@ -140,9 +144,9 @@ fn test_invalid_websocket_headers() {
         .header("upgrade", "http2")
         .body(Body::empty())
         .unwrap();
-    
+
     assert!(!ProxyHandler::is_websocket_request(&request2));
-    
+
     // Missing connection header
     let request3 = Request::builder()
         .method("GET")
@@ -150,6 +154,6 @@ fn test_invalid_websocket_headers() {
         .header("upgrade", "websocket")
         .body(Body::empty())
         .unwrap();
-    
+
     assert!(!ProxyHandler::is_websocket_request(&request3));
 }

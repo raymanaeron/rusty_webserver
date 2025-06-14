@@ -14,6 +14,10 @@ tracing = { workspace = true }
 # Future dependencies for Phase 2+
 toml = { workspace = true }
 
+# Phase 6.1 - SSL/TLS Support  
+rustls = { workspace = true }
+rustls-pemfile = { workspace = true }
+
 [dev-dependencies]
 tokio = { workspace = true }
 tower = { workspace = true }

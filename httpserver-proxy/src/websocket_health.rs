@@ -1,8 +1,8 @@
 // WebSocket health check implementation
 use std::time::Duration;
 use tokio::time::timeout;
-use tokio_tungstenite::{connect_async, tungstenite::Message as TungsteniteMessage};
-use futures_util::{SinkExt, StreamExt};
+use tokio_tungstenite::{ connect_async, tungstenite::Message as TungsteniteMessage };
+use futures_util::{ SinkExt, StreamExt };
 use httpserver_config::WebSocketHealthConfig;
 use tracing;
 
@@ -14,7 +14,8 @@ pub struct WebSocketHealthChecker {
 impl WebSocketHealthChecker {
     pub fn new(config: WebSocketHealthConfig) -> Self {
         Self { config }
-    }    /// Check if a WebSocket target is healthy
+    }
+    /// Check if a WebSocket target is healthy
     #[tracing::instrument(skip(self), fields(timeout = self.config.timeout))]
     pub async fn check_health(&self, target_url: &str) -> bool {
         // Convert HTTP URL to WebSocket URL for health check
@@ -28,10 +29,12 @@ impl WebSocketHealthChecker {
             "Starting WebSocket health check"
         );
 
-        match timeout(
-            Duration::from_secs(self.config.timeout),
-            self.perform_health_check(&health_url)
-        ).await {
+        match
+            timeout(
+                Duration::from_secs(self.config.timeout),
+                self.perform_health_check(&health_url)
+            ).await
+        {
             Ok(result) => {
                 tracing::debug!(
                     health_url = %health_url,
@@ -39,7 +42,7 @@ impl WebSocketHealthChecker {
                     "WebSocket health check completed"
                 );
                 result
-            },
+            }
             Err(_) => {
                 tracing::warn!(
                     health_url = %health_url,
@@ -49,7 +52,8 @@ impl WebSocketHealthChecker {
                 false
             }
         }
-    }    /// Perform the actual WebSocket health check
+    }
+    /// Perform the actual WebSocket health check
     #[tracing::instrument(skip(self))]
     async fn perform_health_check(&self, ws_url: &str) -> bool {
         match connect_async(ws_url).await {
@@ -61,7 +65,11 @@ impl WebSocketHealthChecker {
                 );
 
                 // Send ping message
-                if let Err(e) = ws_stream.send(TungsteniteMessage::Text(self.config.ping_message.clone())).await {
+                if
+                    let Err(e) = ws_stream.send(
+                        TungsteniteMessage::Text(self.config.ping_message.clone())
+                    ).await
+                {
                     tracing::error!(
                         ws_url = %ws_url,
                         error = %e,
@@ -143,9 +151,11 @@ impl WebSocketHealthMonitor {
     }
 
     /// Start background health monitoring with callback for health status updates
-    pub async fn start_monitoring_with_callback<F>(&self, health_callback: F) -> tokio::task::JoinHandle<()>
-    where
-        F: Fn(&str, bool) + Send + Sync + 'static,
+    pub async fn start_monitoring_with_callback<F>(
+        &self,
+        health_callback: F
+    ) -> tokio::task::JoinHandle<()>
+        where F: Fn(&str, bool) + Send + Sync + 'static
     {
         let checker = WebSocketHealthChecker::new(self.checker.config.clone());
         let targets = self.targets.clone();
@@ -153,17 +163,18 @@ impl WebSocketHealthMonitor {
 
         tokio::spawn(async move {
             let mut interval_timer = tokio::time::interval(interval);
-            
+
             loop {
                 interval_timer.tick().await;
-                
+
                 for target in &targets {
                     let is_healthy = checker.check_health(target).await;
-                    println!("WebSocket health check for {}: {}", 
-                        target, 
-                        if is_healthy { "HEALTHY" } else { "UNHEALTHY" }
-                    );
-                    
+                    println!("WebSocket health check for {}: {}", target, if is_healthy {
+                        "HEALTHY"
+                    } else {
+                        "UNHEALTHY"
+                    });
+
                     // Update load balancer target health status via callback
                     health_callback(target, is_healthy);
                 }
@@ -174,10 +185,11 @@ impl WebSocketHealthMonitor {
     /// Start background health monitoring (legacy method for backward compatibility)
     pub async fn start_monitoring(&self) -> tokio::task::JoinHandle<()> {
         self.start_monitoring_with_callback(|target, is_healthy| {
-            println!("WebSocket health update for {}: {}", 
-                target, 
-                if is_healthy { "HEALTHY" } else { "UNHEALTHY" }
-            );
+            println!("WebSocket health update for {}: {}", target, if is_healthy {
+                "HEALTHY"
+            } else {
+                "UNHEALTHY"
+            });
         }).await
     }
 }

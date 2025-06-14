@@ -1,10 +1,10 @@
-use httpserver_balancer::{LoadBalancer, LoadBalancingStrategy, Target};
+use httpserver_balancer::{ LoadBalancer, LoadBalancingStrategy, Target };
 
 fn create_test_targets() -> Vec<Target> {
     vec![
         Target::new("http://localhost:3000".to_string()),
         Target::new("http://localhost:3001".to_string()),
-        Target::new("http://localhost:3002".to_string()),
+        Target::new("http://localhost:3002".to_string())
     ]
 }
 
@@ -12,7 +12,7 @@ fn create_weighted_targets() -> Vec<Target> {
     vec![
         Target::with_weight("http://localhost:3000".to_string(), 3),
         Target::with_weight("http://localhost:3001".to_string(), 2),
-        Target::with_weight("http://localhost:3002".to_string(), 1),
+        Target::with_weight("http://localhost:3002".to_string(), 1)
     ]
 }
 
@@ -45,9 +45,18 @@ fn test_weighted_round_robin_strategy() {
         .collect();
 
     // Count occurrences
-    let count_3000 = selections.iter().filter(|&url| url == "http://localhost:3000").count();
-    let count_3001 = selections.iter().filter(|&url| url == "http://localhost:3001").count();
-    let count_3002 = selections.iter().filter(|&url| url == "http://localhost:3002").count();
+    let count_3000 = selections
+        .iter()
+        .filter(|&url| url == "http://localhost:3000")
+        .count();
+    let count_3001 = selections
+        .iter()
+        .filter(|&url| url == "http://localhost:3001")
+        .count();
+    let count_3002 = selections
+        .iter()
+        .filter(|&url| url == "http://localhost:3002")
+        .count();
 
     // Verify weight ratios (approximately 3:2:1)
     // With weight 3:2:1, we expect roughly 50% : 33% : 17%
@@ -92,7 +101,9 @@ fn test_least_connections_strategy() {
     // Now target2 should have fewer connections and be preferred
     let target3 = balancer.select_target().unwrap();
     // Should prefer target2 or a target with fewer connections
-    assert!(balancer.get_connection_count(&target3.url) <= balancer.get_connection_count(&target1.url));
+    assert!(
+        balancer.get_connection_count(&target3.url) <= balancer.get_connection_count(&target1.url)
+    );
 
     // Test connection cleanup
     balancer.end_request(&target1.url);

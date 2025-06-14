@@ -1,14 +1,14 @@
 use axum::{
     extract::Path,
-    http::{header, StatusCode},
-    response::{IntoResponse, Response},
+    http::{ header, StatusCode },
+    response::{ IntoResponse, Response },
     routing::get,
     Router,
     Json,
 };
 use httpserver_core::create_error_response;
 use mime_guess::from_path;
-use serde_json::{json, Value};
+use serde_json::{ json, Value };
 use std::path::PathBuf;
 use tokio::fs;
 use tracing;
@@ -50,12 +50,16 @@ impl StaticHandler {
         let serve_dir_clone = self.base_dir.clone();
 
         Router::new()
-            .route("/", get({
-                move || serve_file("index.html".to_string(), serve_dir)
-            }))
-            .route("/*path", get(move |Path(path): Path<String>| {
-                serve_file(path, serve_dir_clone)
-            }))
+            .route(
+                "/",
+                get({
+                    move || serve_file("index.html".to_string(), serve_dir)
+                })
+            )
+            .route(
+                "/*path",
+                get(move |Path(path): Path<String>| { serve_file(path, serve_dir_clone) })
+            )
     }
 }
 
@@ -71,7 +75,7 @@ async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
 
     // Remove leading slash if present
     let clean_path = requested_path.strip_prefix('/').unwrap_or(&requested_path);
-    
+
     // Build the full file path
     let file_path = base_dir.join(clean_path);
 
@@ -105,7 +109,7 @@ async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
         Ok(contents) => {
             // Guess the MIME type based on file extension
             let mime_type = from_path(&file_path).first_or_octet_stream();
-            
+
             tracing::info!(
                 file_path = %file_path.display(),
                 file_size = contents.len(),
@@ -113,7 +117,7 @@ async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
                 cache_control = "public, max-age=3600",
                 "Static file served successfully"
             );
-            
+
             Response::builder()
                 .status(StatusCode::OK)
                 .header(header::CONTENT_TYPE, mime_type.as_ref())
@@ -127,7 +131,7 @@ async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
                 error = %e,
                 "Failed to read requested file, attempting SPA fallback"
             );
-            
+
             // If the requested file doesn't exist, try to serve index.html for SPA support
             if clean_path != "index.html" {
                 let index_path = base_dir.join("index.html");
@@ -138,7 +142,7 @@ async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
                         file_size = contents.len(),
                         "SPA fallback served index.html"
                     );
-                    
+
                     return Response::builder()
                         .status(StatusCode::OK)
                         .header(header::CONTENT_TYPE, "text/html")
@@ -160,11 +164,13 @@ async fn serve_file(path: String, base_dir: PathBuf) -> impl IntoResponse {
 
 /// Health endpoint handler for static file service
 pub async fn static_health() -> Json<Value> {
-    Json(json!({
+    Json(
+        json!({
         "status": "healthy",
         "service": "httpserver-static",
         "message": "Static file serving operational"
-    }))
+    })
+    )
 }
 
 /// Create static service health router

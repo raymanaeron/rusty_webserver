@@ -1,0 +1,56 @@
+# HTTP Server Gateway - SSL/TLS Configuration Example
+# Phase 6.1 - SSL Foundation
+
+[server]
+port = 8080
+# SSL/TLS configuration
+[server.ssl]
+enabled = true
+https_port = 8443
+
+# Main SSL certificate files
+cert_file = "certs/server.crt"
+key_file = "certs/server.key"
+cert_chain_file = "certs/chain.pem"  # Optional certificate chain
+
+# Wildcard certificate configuration for *.httpserver.io
+[server.ssl.wildcard]
+domain = "*.httpserver.io"
+cert_file = "certs/wildcard.crt"
+key_file = "certs/wildcard.key"
+
+# Let's Encrypt integration (future implementation)
+[server.ssl.letsencrypt]
+enabled = false
+email = "admin@httpserver.io"
+domain = "httpserver.io"
+
+# DNS challenge for wildcard certificates
+[server.ssl.letsencrypt.dns_challenge]
+provider = "cloudflare"  # DNS provider for DNS-01 challenge
+api_token = "your-cloudflare-api-token"
+
+# Route-specific SSL configuration
+[[proxy]]
+path = "/secure-api/*"
+target = "https://backend-api.internal:8443"
+strategy = "round_robin"
+
+# SSL configuration for this specific route
+[proxy.ssl]
+verify_backend = true          # Verify backend SSL certificates
+client_cert_file = "certs/client.crt"    # Client certificate for backend
+client_key_file = "certs/client.key"     # Client key for backend
+
+# Static file serving configuration
+[static]
+directory = "./public"
+
+# Logging configuration
+[logging]
+level = "info"
+format = "json"
+directory = "./logs"
+max_size_mb = 100
+max_files = 5
+max_age_days = 30

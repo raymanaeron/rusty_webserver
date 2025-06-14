@@ -1,10 +1,10 @@
-use httpserver_balancer::{LoadBalancingStrategy, Target};
+use httpserver_balancer::{ LoadBalancingStrategy, Target };
 
 fn create_weighted_targets() -> Vec<Target> {
     vec![
         Target::with_weight("http://localhost:3000".to_string(), 3),
         Target::with_weight("http://localhost:3001".to_string(), 2),
-        Target::with_weight("http://localhost:3002".to_string(), 1),
+        Target::with_weight("http://localhost:3002".to_string(), 1)
     ]
 }
 
@@ -14,19 +14,31 @@ fn create_weighted_targets() -> Vec<Target> {
 fn test_gcd_calculation() {
     // Test with weights [3, 2, 1] - GCD should be 1
     let targets = create_weighted_targets();
-    let balancer = httpserver_balancer::LoadBalancer::new(targets, LoadBalancingStrategy::WeightedRoundRobin);
-    
+    let balancer = httpserver_balancer::LoadBalancer::new(
+        targets,
+        LoadBalancingStrategy::WeightedRoundRobin
+    );
+
     // Test that the weighted round robin works correctly with these weights
     // This implicitly tests that GCD calculation is working
     let selections: Vec<String> = (0..12)
         .map(|_| balancer.select_target().unwrap().url.clone())
         .collect();
-    
+
     // Count occurrences to verify GCD is working properly
-    let count_3000 = selections.iter().filter(|&url| url == "http://localhost:3000").count();
-    let count_3001 = selections.iter().filter(|&url| url == "http://localhost:3001").count();
-    let count_3002 = selections.iter().filter(|&url| url == "http://localhost:3002").count();
-    
+    let count_3000 = selections
+        .iter()
+        .filter(|&url| url == "http://localhost:3000")
+        .count();
+    let count_3001 = selections
+        .iter()
+        .filter(|&url| url == "http://localhost:3001")
+        .count();
+    let count_3002 = selections
+        .iter()
+        .filter(|&url| url == "http://localhost:3002")
+        .count();
+
     // With weights 3:2:1, we should see approximately this ratio
     assert!(count_3000 >= count_3001);
     assert!(count_3001 >= count_3002);
@@ -35,19 +47,31 @@ fn test_gcd_calculation() {
     let even_targets = vec![
         Target::with_weight("http://localhost:3000".to_string(), 6),
         Target::with_weight("http://localhost:3001".to_string(), 4),
-        Target::with_weight("http://localhost:3002".to_string(), 2),
+        Target::with_weight("http://localhost:3002".to_string(), 2)
     ];
-    let balancer = httpserver_balancer::LoadBalancer::new(even_targets, LoadBalancingStrategy::WeightedRoundRobin);
-    
+    let balancer = httpserver_balancer::LoadBalancer::new(
+        even_targets,
+        LoadBalancingStrategy::WeightedRoundRobin
+    );
+
     // Test that even weights work correctly
     let selections: Vec<String> = (0..12)
         .map(|_| balancer.select_target().unwrap().url.clone())
         .collect();
-    
-    let count_3000 = selections.iter().filter(|&url| url == "http://localhost:3000").count();
-    let count_3001 = selections.iter().filter(|&url| url == "http://localhost:3001").count();
-    let count_3002 = selections.iter().filter(|&url| url == "http://localhost:3002").count();
-    
+
+    let count_3000 = selections
+        .iter()
+        .filter(|&url| url == "http://localhost:3000")
+        .count();
+    let count_3001 = selections
+        .iter()
+        .filter(|&url| url == "http://localhost:3001")
+        .count();
+    let count_3002 = selections
+        .iter()
+        .filter(|&url| url == "http://localhost:3002")
+        .count();
+
     // With weights 6:4:2 (3:2:1), we should see this ratio
     assert!(count_3000 >= count_3001);
     assert!(count_3001 >= count_3002);
