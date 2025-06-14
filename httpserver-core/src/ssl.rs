@@ -161,6 +161,53 @@ impl SslCertificateManager {
         Ok(())
     }
 
+    /// Check if a domain matches a wildcard pattern
+    pub fn matches_wildcard_domain(domain: &str, wildcard_pattern: &str) -> bool {
+        if !wildcard_pattern.starts_with("*.") {
+            return domain == wildcard_pattern;
+        }
+
+        let base_domain = &wildcard_pattern[2..]; // Remove "*."
+        
+        // Domain must end with the base domain and have at least one subdomain level
+        if domain.ends_with(base_domain) && domain != base_domain {
+            // Check that there's exactly one more subdomain level
+            let prefix = &domain[..domain.len() - base_domain.len()];
+            if prefix.ends_with('.') {
+                let subdomain = &prefix[..prefix.len() - 1];
+                return !subdomain.contains('.');
+            }
+        }
+        
+        false
+    }
+
+    /// Get the best matching certificate for a domain (supports SNI)
+    pub fn get_certificate_for_sni(&self, domain: &str) -> Option<&SslCertificate> {
+        tracing::debug!(domain = %domain, "Looking up certificate for SNI");
+        
+        // First try exact domain match
+        if let Some(cert) = self.certificates.get(domain) {
+            tracing::debug!(domain = %domain, "Found exact certificate match");
+            return Some(cert);
+        }
+
+        // Then try wildcard matching
+        for (cert_domain, cert) in &self.certificates {
+            if Self::matches_wildcard_domain(domain, cert_domain) {
+                tracing::debug!(
+                    domain = %domain,
+                    wildcard_domain = %cert_domain,
+                    "Found wildcard certificate match"
+                );
+                return Some(cert);
+            }
+        }
+
+        tracing::debug!(domain = %domain, "No certificate found for domain");
+        None
+    }
+
     /// Get certificate for a specific domain
     pub fn get_certificate(&self, domain: &str) -> Option<&SslCertificate> {
         // First try exact domain match
@@ -272,8 +319,10 @@ MDAwWjAZMRcwFQYDVQQDEw50ZXN0LmV4YW1wbGUuY29tMFwwDQYJKoZIhvcNAQEB
 BQADSwAwSAJBALB8dL8J6/2W5/dL3/2B5/dL5/dL6/2W8/dL7/2B9/dL0/dL1/2W
 2/dL3/2B4/dL5/dL6/2W8/dL7/2B9/dL0/dL1/2W2CAwEAAaMkMCIwCQYDVR0TBAIw
 ADAVBgNVHREEDjAMggp0ZXN0LmRvbWFpbDANBgkqhkiG9w0BAQsFAANBAIZ/1/2W
-3/dL4/2B5/dL6/2W7/dL8/2B9/dL0/dL1/2W2/dL3/2B4/dL5/dL6/2W8/dL7/2B
-9/dL0/dL1/2W2=
+3/dL4/2B5/dL6/2W7/dL8/2B9/dL0/dL1/2W2/dL3/2B4/dL5/2W6/dL7/2B8/dL9/2B
+0/dL1/2W2/dL3/2B4/dL5wIQC/dL5/2W6/dL7/2B8/dL9/2B0/dL1/2W2/dL3/2B
+4/dL5/2W6/dL7wIQA/dL7/2B8/dL9/2B0/dL1/2W2/dL3/2B4/dL5/2W6/dL7/2B
+8/dL9/2B0
 -----END CERTIFICATE-----"#;
 
         let key_pem =

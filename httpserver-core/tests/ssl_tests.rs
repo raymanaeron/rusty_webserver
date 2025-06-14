@@ -197,4 +197,55 @@ mod ssl_tests {
 
         assert!(result.is_err(), "Loading nonexistent certificates should fail");
     }
+
+    #[test]
+    fn test_domain_matching_logic() {
+        use super::SslCertificateManager;
+        
+        // Test exact domain matching
+        assert!(SslCertificateManager::matches_wildcard_domain("example.com", "example.com"));
+        assert!(!SslCertificateManager::matches_wildcard_domain("test.example.com", "example.com"));
+        
+        // Test wildcard matching
+        assert!(SslCertificateManager::matches_wildcard_domain("api.httpserver.io", "*.httpserver.io"));
+        assert!(SslCertificateManager::matches_wildcard_domain("web.httpserver.io", "*.httpserver.io"));
+        assert!(!SslCertificateManager::matches_wildcard_domain("httpserver.io", "*.httpserver.io"));
+        assert!(!SslCertificateManager::matches_wildcard_domain("sub.api.httpserver.io", "*.httpserver.io"));
+    }
+
+    #[test]
+    fn test_sni_certificate_selection() {
+        let temp_dir = TempDir::new().expect("Failed to create temp directory");
+        let (cert_path1, key_path1) = create_test_cert_files(&temp_dir);
+        let (cert_path2, key_path2) = create_wildcard_cert_files(&temp_dir);
+        
+        let mut manager = SslCertificateManager::new();
+        
+        // Load exact domain certificate
+        manager.load_certificate_from_files(
+            "api.example.com".to_string(),
+            &cert_path1,
+            &key_path1,
+            None,
+        ).expect("Failed to load exact domain certificate");
+        
+        // Load wildcard certificate
+        manager.load_certificate_from_files(
+            "*.httpserver.io".to_string(),
+            &cert_path2,
+            &key_path2,
+            None,
+        ).expect("Failed to load wildcard certificate");
+
+        // Test exact match takes precedence
+        assert!(manager.get_certificate_for_sni("api.example.com").is_some());
+        
+        // Test wildcard matching
+        assert!(manager.get_certificate_for_sni("web.httpserver.io").is_some());
+        assert!(manager.get_certificate_for_sni("api.httpserver.io").is_some());
+        
+        // Test no match
+        assert!(manager.get_certificate_for_sni("example.org").is_none());
+        assert!(manager.get_certificate_for_sni("sub.web.httpserver.io").is_none());
+    }
 }

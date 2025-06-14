@@ -13,6 +13,7 @@ fn create_test_route(path: &str, target: &str) -> ProxyRoute {
         websocket_health: None,
         circuit_breaker: None,
         middleware: None,
+        ssl: None,
     }
 }
 
