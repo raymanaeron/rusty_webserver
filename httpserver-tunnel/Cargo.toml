@@ -1,0 +1,36 @@
+[package]
+name = "httpserver-tunnel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Workspace dependencies - shared across all crates
+tokio = { workspace = true, features = ["full"] }
+tokio-util = { workspace = true, features = ["io"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true, features = ["v4"] }
+chrono = { workspace = true, features = ["serde"] }
+
+# WebSocket dependencies - reusing existing workspace deps
+tokio-tungstenite = { workspace = true, features = ["rustls-tls-webpki-roots"] }
+tungstenite = { workspace = true }
+futures-util = { workspace = true }
+
+# SSL/TLS dependencies - reusing existing workspace deps  
+rustls = { workspace = true }
+tokio-rustls = { workspace = true }
+webpki-roots = { workspace = true }
+
+# HTTP client for tunnel server communication
+reqwest = { workspace = true, features = ["json", "rustls-tls", "stream"] }
+
+# URL parsing for tunnel endpoints
+url = "2.4"
+
+# Server dependencies for Phase 7.2
+axum = { workspace = true, features = ["ws"] }
+tower = { workspace = true }
+tower-http = { workspace = true, features = ["cors"] }
+rand = "0.8"

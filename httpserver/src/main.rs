@@ -10,6 +10,7 @@ use httpserver_core::{
 use httpserver_static::{ StaticHandler, create_static_health_router };
 use httpserver_proxy::ProxyHandler;
 use httpserver_balancer::create_balancer_health_router;
+use httpserver_tunnel::server::TunnelServer;
 use axum::{
     Router,
     extract::{ Request, ConnectInfo },
@@ -107,6 +108,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
+    // Initialize tunnel server if configured
+    let tunnel_server = if config.tunnel.enabled {
+        tracing::info!("Tunnel server enabled, initializing");
+        let server = TunnelServer::new(config.tunnel.server.clone())?;
+        
+        // Start tunnel server in background
+        let tunnel_handle = {
+            let server = server;
+            tokio::spawn(async move {
+                if let Err(e) = server.start().await {
+                    tracing::error!("Tunnel server error: {}", e);
+                }
+            })
+        };
+        
+        tracing::info!(
+            port = config.tunnel.server.tunnel_port,
+            base_domain = %config.tunnel.server.base_domain,
+            "Tunnel server started"
+        );
+        
+        Some(tunnel_handle)
+    } else {
+        tracing::info!("Tunnel server disabled");
+        None
+    };
+
     // Create the router with proxy routes taking precedence over static files
     let app = create_router(proxy_handler, static_handler, &config).await?;
 
@@ -118,7 +146,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Server::new(port)
     };
 
-    server.start(app).await?;
+    // Start main server and tunnel server concurrently
+    if let Some(tunnel_handle) = tunnel_server {
+        tracing::info!("Starting main HTTP server and tunnel server concurrently");
+        
+        let main_server_future = server.start(app);
+        
+        // Wait for either server to complete (or error)
+        tokio::select! {
+            result = main_server_future => {
+                tracing::info!("Main server completed");
+                result?;
+            }
+            result = tunnel_handle => {
+                tracing::info!("Tunnel server completed");
+                if let Err(e) = result {
+                    tracing::error!("Tunnel server task error: {}", e);
+                    return Err(e.into());
+                }
+            }
+        }
+    } else {
+        // No tunnel server, just start main server
+        tracing::info!("Starting main HTTP server only");
+        server.start(app).await?;
+    }
 
     Ok(())
 }

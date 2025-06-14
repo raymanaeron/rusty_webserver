@@ -3,9 +3,10 @@ members = [
     "httpserver",           # Main binary crate
     "httpserver-core",      # Core server functionality
     "httpserver-static",    # Static file serving
-    "httpserver-proxy",     # Reverse proxy (future)
-    "httpserver-balancer",  # Load balancing (future)
+    "httpserver-proxy",     # Reverse proxy
+    "httpserver-balancer",  # Load balancing
     "httpserver-config",    # Configuration parsing
+    "httpserver-tunnel",    # Tunnel client (Phase 7.1)
 ]
 
 resolver = "2"
@@ -54,6 +55,9 @@ webpki-roots = "0.25"
 hyper = { version = "1.0", features = ["full"] }
 hyper-util = { version = "0.1", features = ["full"] }
 axum-server = { version = "0.7", features = ["tls-rustls"] }
+
+# Phase 7.1 - Tunnel Client Dependencies
+url = "2.4"
 
 # Safer release profile for macOS app bundles
 # Avoids aggressive optimizations that can cause crashes with WebView/FFI

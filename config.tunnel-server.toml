@@ -1,0 +1,226 @@
+# Phase 7.2 Tunnel Server Configuration
+# This file contains both tunnel client and server settings for the HTTP Server Gateway
+
+[tunnel]
+# Enable tunnel functionality (both client and server)
+enabled = true
+
+# Local port to tunnel (defaults to server port if not specified)
+local_port = 8080
+
+# Local host to bind to
+local_host = "127.0.0.1"
+
+# Tunnel endpoints configuration (for client mode)
+[[tunnel.endpoints]]
+# Tunnel server URL (WebSocket endpoint)
+server_url = "wss://localhost:8081/connect"
+
+# Requested subdomain (optional, server may assign one)
+subdomain = "test-app"
+
+# Protocol version
+protocol_version = "1.0"
+
+# Connection timeout in seconds
+connection_timeout = 30
+
+# Keep-alive interval in seconds
+keepalive_interval = 30
+
+# Maximum concurrent connections through this tunnel
+max_connections = 100
+
+# Authentication configuration (for client)
+[tunnel.auth]
+# Authentication method: "api_key", "token", or "certificate"
+method = "api_key"
+
+# API key for authentication (required for api_key method)
+api_key = "test-api-key-123"
+
+# Auto-reconnection configuration
+[tunnel.reconnection]
+# Enable auto-reconnection
+enabled = true
+
+# Initial retry delay in seconds
+initial_delay = 1
+
+# Maximum retry delay in seconds (5 minutes)
+max_delay = 300
+
+# Backoff multiplier
+backoff_multiplier = 2.0
+
+# Maximum retry attempts (0 = unlimited)
+max_attempts = 0
+
+# Jitter factor for retry delays
+jitter_factor = 0.1
+
+# Status monitoring configuration
+[tunnel.monitoring]
+# Enable status monitoring
+enabled = true
+
+# Health check interval in seconds
+health_interval = 60
+
+# Connection metrics collection
+collect_metrics = true
+
+# Log tunnel events
+log_events = true
+
+# SSL/TLS configuration for tunnel connections
+[tunnel.ssl]
+# Verify server certificates
+verify_server = false
+
+# ALPN protocols
+alpn_protocols = []
+
+# ========================================
+# TUNNEL SERVER CONFIGURATION (Phase 7.2)
+# ========================================
+
+[tunnel.server]
+# Enable tunnel server functionality
+enabled = true
+
+# Port for tunnel WebSocket connections
+tunnel_port = 8081
+
+# Base domain for tunnel subdomains
+base_domain = "localhost.tunnel"
+
+# Public HTTP port (where subdomain traffic is served)
+public_port = 80
+
+# Maximum number of concurrent tunnels
+max_tunnels = 100
+
+# Subdomain allocation strategy: "random", "uuid", or "user_specified"
+subdomain_strategy = "random"
+
+# Default subdomain length (for random strategy)
+subdomain_length = 8
+
+# Reserved subdomains that cannot be allocated
+reserved_subdomains = ["www", "api", "admin", "mail", "ftp"]
+
+# Tunnel server authentication configuration
+[tunnel.server.auth]
+# Require authentication for tunnel connections
+required = true
+
+# API keys for authentication
+api_keys = ["test-api-key-123", "dev-key-456", "prod-key-789"]
+
+# JWT authentication settings
+[tunnel.server.auth.jwt]
+enabled = false
+# secret = "your-jwt-secret"
+# issuer = "httpserver-tunnel"
+# audience = "tunnel-clients"
+# expiration_hours = 24
+
+# Rate limiting configuration
+[tunnel.server.rate_limit]
+# Enable rate limiting
+enabled = true
+
+# Maximum requests per tunnel per minute
+requests_per_minute = 1000
+
+# Maximum concurrent connections per tunnel
+max_connections_per_tunnel = 50
+
+# Maximum bandwidth per tunnel (bytes per second)
+max_bandwidth_per_tunnel = 10485760  # 10 MB/s
+
+# Burst allowance for rate limiting
+burst_allowance = 100
+
+# SSL/TLS configuration for tunnel server
+[tunnel.server.ssl]
+# Enable SSL for public endpoints
+enabled = false
+
+# Certificate file path
+# cert_file = "certs/server.crt"
+
+# Private key file path
+# key_file = "certs/server.key"
+
+# Certificate chain file (optional)
+# cert_chain_file = "certs/chain.pem"
+
+# Supported TLS versions
+min_tls_version = "1.2"
+max_tls_version = "1.3"
+
+# Cipher suites (empty = default)
+cipher_suites = []
+
+# Health monitoring for tunnel server
+[tunnel.server.monitoring]
+# Enable server health monitoring
+enabled = true
+
+# Health check endpoint path
+health_endpoint = "/health"
+
+# Metrics collection
+collect_metrics = true
+
+# Metrics endpoint path
+metrics_endpoint = "/metrics"
+
+# Server status logging
+log_server_status = true
+
+# Log tunnel connections/disconnections
+log_tunnel_events = true
+
+# Performance monitoring
+[tunnel.server.performance]
+# Connection pool settings
+connection_pool_size = 1000
+
+# Worker thread count (0 = auto-detect)
+worker_threads = 0
+
+# Buffer sizes for WebSocket communication
+websocket_buffer_size = 65536
+
+# HTTP request buffer size
+http_buffer_size = 32768
+
+# Tunnel cleanup interval (seconds)
+cleanup_interval = 300
+
+# Security settings
+[tunnel.server.security]
+# Enable CORS for public endpoints
+cors_enabled = true
+
+# Allowed origins for CORS (empty = all)
+cors_origins = []
+
+# Request validation
+validate_host_headers = true
+validate_content_length = true
+
+# Maximum request size (bytes)
+max_request_size = 104857600  # 100 MB
+
+# Connection timeout settings
+connection_timeout = 60
+idle_timeout = 300
+
+# Anti-abuse settings
+max_subdomain_length = 32
+min_subdomain_length = 3
+block_suspicious_patterns = true

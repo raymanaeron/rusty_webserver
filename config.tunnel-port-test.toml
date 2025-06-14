@@ -1,0 +1,91 @@
+# Test Configuration for Tunnel Server Port Validation
+# This configuration enables the tunnel server with custom ports to verify
+# that all port configurations work correctly
+
+# Override SSL configuration from app_config.toml
+[server]
+default_port = 8090
+request_timeout = 30
+
+# Disable SSL completely
+[server.ssl]
+enabled = false
+
+[logging]
+level = "info"
+file_logging = false
+format = "text"
+output_mode = "console"
+
+[application]
+name = "httpserver-tunnel-test"
+environment = "development"
+
+[static_config]
+directory = "."
+fallback = "index.html"
+
+# Enable tunnel functionality with custom ports
+[tunnel]
+enabled = true
+local_port = 8090
+local_host = "127.0.0.1"
+
+[tunnel.server]
+# Enable tunnel server functionality
+enabled = true
+
+# Custom ports for testing (safe ports that don't conflict)
+tunnel_port = 8091      # WebSocket tunnel connections
+public_port = 8092      # Public HTTP traffic
+public_https_port = 8093 # Public HTTPS traffic (even though SSL disabled)
+
+# Test domain
+base_domain = "test.localhost"
+
+# Reduced limits for testing
+max_tunnels = 5
+
+# Strategy for subdomain allocation
+subdomain_strategy = "Random"
+
+# Network configuration - bind to localhost for safety
+[tunnel.server.network]
+bind_address = "127.0.0.1"
+public_bind_address = "127.0.0.1"
+ipv6_enabled = false
+tcp_keepalive = true
+
+# Authentication disabled for testing
+[tunnel.server.auth]
+required = false
+api_keys = []
+
+# Rate limiting disabled for testing
+[tunnel.server.rate_limit]
+enabled = false
+
+# SSL disabled for testing
+[tunnel.server.ssl]
+enabled = false
+
+# Enable monitoring for verification
+[tunnel.server.monitoring]
+enabled = true
+health_endpoint = "/health"
+collect_metrics = false
+log_tunnel_events = true
+
+# Performance settings for testing
+[tunnel.server.performance]
+connection_pool_size = 10
+worker_threads = 1
+
+# Security settings for testing
+[tunnel.server.security]
+cors_enabled = true
+cors_origins = []
+validate_host_headers = false
+max_request_size = 1048576  # 1MB
+connection_timeout = 30
+idle_timeout = 120

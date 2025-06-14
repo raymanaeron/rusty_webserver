@@ -7,6 +7,7 @@ edition = "2021"
 serde = { workspace = true }
 clap = { workspace = true }
 httpserver-balancer = { path = "../httpserver-balancer" }
+httpserver-tunnel = { path = "../httpserver-tunnel" }
 axum = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }

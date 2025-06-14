@@ -9,6 +9,7 @@ use httpserver_config::{
     LoggingConfig,
     ApplicationConfig,
     ServerConfig,
+    TunnelConfig,
 };
 use httpserver_balancer::{ Target, LoadBalancingStrategy };
 use std::path::PathBuf;
@@ -185,8 +186,7 @@ ping_message = "health_check"
 }
 
 #[test]
-fn test_config_validation_invalid_directory() {
-    let config = Config {
+fn test_config_validation_invalid_directory() {    let config = Config {
         static_config: StaticConfig {
             directory: PathBuf::from("/nonexistent/directory"),
             fallback: "index.html".to_string(),
@@ -195,6 +195,7 @@ fn test_config_validation_invalid_directory() {
         logging: LoggingConfig::default(),
         application: ApplicationConfig::default(),
         server: ServerConfig::default(),
+        tunnel: TunnelConfig::default(),
     };
 
     let result = config.validate();
@@ -219,12 +220,12 @@ fn test_config_validation_invalid_proxy_route() {
             http_health: None,
             websocket_health: None,
             ssl: None,
-            circuit_breaker: None,
-            middleware: None,
+            circuit_breaker: None,            middleware: None,
         }],
         logging: LoggingConfig::default(),
         application: ApplicationConfig::default(),
         server: ServerConfig::default(),
+        tunnel: TunnelConfig::default(),
     };
 
     let result = config.validate();
@@ -250,11 +251,11 @@ fn test_config_validation_no_targets() {
             websocket_health: None,
             ssl: None,
             circuit_breaker: None,
-            middleware: None,
-        }],
+            middleware: None,        }],
         logging: LoggingConfig::default(),
         application: ApplicationConfig::default(),
         server: ServerConfig::default(),
+        tunnel: TunnelConfig::default(),
     };
 
     let result = config.validate();
@@ -280,11 +281,11 @@ fn test_config_validation_invalid_url() {
             websocket_health: None,
             ssl: None,
             circuit_breaker: None,
-            middleware: None,
-        }],
+            middleware: None,        }],
         logging: LoggingConfig::default(),
         application: ApplicationConfig::default(),
         server: ServerConfig::default(),
+        tunnel: TunnelConfig::default(),
     };
 
     let result = config.validate();

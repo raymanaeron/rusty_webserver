@@ -1,0 +1,128 @@
+# Phase 7.1 Tunnel Client Configuration
+# This file contains the tunnel client settings for the HTTP Server Gateway
+
+[tunnel]
+# Enable tunnel functionality
+enabled = false
+
+# Local port to tunnel (defaults to server port if not specified)
+local_port = 8080
+
+# Local host to bind to
+local_host = "127.0.0.1"
+
+# Tunnel endpoints configuration
+[[tunnel.endpoints]]
+# Tunnel server URL (WebSocket endpoint)
+server_url = "wss://tunnel.httpserver.io/connect"
+
+# Requested subdomain (optional, server may assign one)
+subdomain = "my-app"
+
+# Custom domain (for custom domain tunnels)
+# custom_domain = "myapp.example.com"
+
+# Protocol version
+protocol_version = "1.0"
+
+# Connection timeout in seconds
+connection_timeout = 30
+
+# Keep-alive interval in seconds
+keepalive_interval = 30
+
+# Maximum concurrent connections through this tunnel
+max_connections = 100
+
+# Authentication configuration
+[tunnel.auth]
+# Authentication method: "api_key", "token", or "certificate"
+method = "api_key"
+
+# API key for authentication (required for api_key method)
+api_key = "your-api-key-here"
+
+# Authentication token (for token method)
+# token = "your-token-here"
+
+# Client certificate for mutual TLS (for certificate method)
+# cert_file = "certs/client.crt"
+# key_file = "certs/client.key"
+
+# User account information
+# user = "username"
+
+# Additional authentication headers
+[tunnel.auth.headers]
+# "X-Custom-Header" = "custom-value"
+
+# Token refresh settings (for token method)
+[tunnel.auth.token_refresh]
+# Enable automatic token refresh
+enabled = false
+
+# Refresh endpoint URL
+# refresh_url = "https://auth.httpserver.io/refresh"
+
+# Refresh interval in seconds (1 hour)
+interval = 3600
+
+# Refresh token
+# refresh_token = "your-refresh-token"
+
+# Auto-reconnection configuration
+[tunnel.reconnection]
+# Enable auto-reconnection
+enabled = true
+
+# Initial retry delay in seconds
+initial_delay = 1
+
+# Maximum retry delay in seconds (5 minutes)
+max_delay = 300
+
+# Backoff multiplier
+backoff_multiplier = 2.0
+
+# Maximum retry attempts (0 = unlimited)
+max_attempts = 0
+
+# Jitter factor for retry delays
+jitter_factor = 0.1
+
+# Status monitoring configuration
+[tunnel.monitoring]
+# Enable status monitoring
+enabled = true
+
+# Health check interval in seconds
+health_interval = 60
+
+# Connection metrics collection
+collect_metrics = true
+
+# Status update callback URL
+# status_webhook = "https://your-app.com/webhook/tunnel-status"
+
+# Log tunnel events
+log_events = true
+
+# SSL/TLS configuration for tunnel connections
+[tunnel.ssl]
+# Verify server certificates
+verify_server = true
+
+# Custom CA certificate bundle
+# ca_file = "certs/ca.pem"
+
+# Client certificate for mutual TLS
+# client_cert = "certs/client.crt"
+
+# Client private key
+# client_key = "certs/client.key"
+
+# SNI hostname override
+# sni_hostname = "tunnel.httpserver.io"
+
+# ALPN protocols
+alpn_protocols = []

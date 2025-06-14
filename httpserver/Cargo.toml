@@ -13,6 +13,7 @@ httpserver-static = { path = "../httpserver-static" }
 httpserver-config = { path = "../httpserver-config" }
 httpserver-proxy = { path = "../httpserver-proxy" }
 httpserver-balancer = { path = "../httpserver-balancer" }
+httpserver-tunnel = { path = "../httpserver-tunnel" }
 
 # CLI dependencies
 clap = { workspace = true }

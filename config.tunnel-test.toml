@@ -1,0 +1,107 @@
+# Test Tunnel Server Configuration
+# Minimal configuration to test tunnel server functionality
+
+# Static file serving configuration (required)
+[static_config]
+directory = "."
+
+# Server configuration (required)
+[server]
+# Disable SSL for testing by overriding app_config.toml
+[server.ssl]
+enabled = false
+
+[tunnel]
+# Enable tunnel functionality
+enabled = true
+
+# Local port to tunnel
+local_port = 8080
+
+# Local host to bind to
+local_host = "127.0.0.1"
+
+# Tunnel server configuration
+[tunnel.server]
+# Enable tunnel server functionality
+enabled = true
+
+# Port for tunnel WebSocket connections (use safe port for testing)
+tunnel_port = 8081
+
+# Public HTTP port (use safe port for testing, not 80)
+public_port = 8082
+
+# Public HTTPS port (use safe port for testing)
+public_https_port = 8443
+
+# Base domain for tunnel subdomains
+base_domain = "localhost.tunnel"
+
+# Maximum number of concurrent tunnels
+max_tunnels = 10
+
+# Subdomain allocation strategy
+subdomain_strategy = "Random"
+
+# Tunnel server authentication configuration
+[tunnel.server.auth]
+# Require authentication for tunnel connections
+required = false
+
+# API keys for authentication (empty for testing)
+api_keys = []
+
+# Rate limiting configuration
+[tunnel.server.rate_limit]
+# Disable rate limiting for testing
+enabled = false
+
+# SSL/TLS configuration for tunnel server
+[tunnel.server.ssl]
+# Disable SSL for testing
+enabled = false
+
+# Health monitoring for tunnel server
+[tunnel.server.monitoring]
+# Enable server health monitoring
+enabled = true
+
+# Health check endpoint path
+health_endpoint = "/health"
+
+# Metrics collection
+collect_metrics = false
+
+# Performance monitoring
+[tunnel.server.performance]
+# Connection pool settings
+connection_pool_size = 100
+
+# Worker thread count (0 = auto-detect)
+worker_threads = 0
+
+# Security settings
+[tunnel.server.security]
+# Enable CORS for public endpoints
+cors_enabled = true
+
+# Allowed origins for CORS (empty = all)
+cors_origins = []
+
+# Request validation
+validate_host_headers = false
+validate_content_length = false
+
+# Maximum request size (bytes)
+max_request_size = 1048576  # 1 MB
+
+# Connection timeout settings
+connection_timeout = 60
+idle_timeout = 300
+
+# Network configuration for testing
+[tunnel.server.network]
+# Bind to localhost only for testing
+bind_address = "127.0.0.1"
+public_bind_address = "127.0.0.1"

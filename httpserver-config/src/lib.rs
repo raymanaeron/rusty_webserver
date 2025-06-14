@@ -47,6 +47,10 @@ pub struct Config {
     /// Server configuration
     #[serde(default)]
     pub server: ServerConfig,
+
+    /// Tunnel client configuration (Phase 7.1)
+    #[serde(default)]
+    pub tunnel: TunnelConfig,
 }
 
 /// Static file serving configuration
@@ -533,6 +537,10 @@ fn default_verify_backend() -> bool {
     true
 }
 
+// Phase 7.1 - Tunnel Client Configuration
+// Import tunnel configuration types
+pub use httpserver_tunnel::{TunnelConfig, TunnelEndpoint, TunnelAuthConfig};
+
 /// Logging configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoggingConfig {
@@ -645,6 +653,7 @@ impl Default for Config {
             logging: LoggingConfig::default(),
             application: ApplicationConfig::default(),
             server: ServerConfig::default(),
+            tunnel: TunnelConfig::default(),
         }
     }
 }
