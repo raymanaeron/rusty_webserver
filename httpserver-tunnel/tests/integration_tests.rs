@@ -171,8 +171,7 @@ async fn test_tunnel_error_types() {
         // Should be able to display all error types
         let error_string = error.to_string();
         assert!(!error_string.is_empty());
-        
-        // Should contain descriptive text
+          // Should contain descriptive text
         match error {
             TunnelError::ConnectionFailed(_) => assert!(error_string.contains("Connection failed")),
             TunnelError::AuthenticationFailed(_) => assert!(error_string.contains("Authentication failed")),
@@ -181,6 +180,11 @@ async fn test_tunnel_error_types() {
             TunnelError::NetworkError(_) => assert!(error_string.contains("Network error")),
             TunnelError::ProtocolError(_) => assert!(error_string.contains("Protocol error")),
             TunnelError::ServerUnavailable(_) => assert!(error_string.contains("Server unavailable")),
+            TunnelError::InternalError(_) => assert!(error_string.contains("Internal error")),
+            TunnelError::ValidationError(_) => assert!(error_string.contains("Validation error")),
+            TunnelError::ConflictError(_) => assert!(error_string.contains("Conflict error")),
+            TunnelError::SerializationError(_) => assert!(error_string.contains("Serialization error")),
+            TunnelError::IoError(_) => assert!(error_string.contains("IO error")),
         }
     }
 }

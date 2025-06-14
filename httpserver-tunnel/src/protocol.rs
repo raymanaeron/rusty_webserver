@@ -56,6 +56,20 @@ pub enum TunnelMessage {
         bytes_sent: u64,
         bytes_received: u64,
     },
+    /// SSL/TLS connection establishment for passthrough
+    SslConnect {
+        id: String,
+        initial_data: Option<Vec<u8>>,
+    },
+    /// SSL/TLS data forwarding
+    SslData {
+        id: String,
+        data: Vec<u8>,
+    },
+    /// SSL/TLS connection close
+    SslClose {
+        id: String,
+    },
 }
 
 /// Tunnel protocol handler
@@ -136,6 +150,29 @@ impl TunnelProtocol {
         TunnelMessage::Error {
             code,
             message: message.to_string(),
+        }
+    }
+
+    /// Create SSL connect message
+    pub fn create_ssl_connect_message(connection_id: &str, initial_data: Option<Vec<u8>>) -> TunnelMessage {
+        TunnelMessage::SslConnect {
+            id: connection_id.to_string(),
+            initial_data,
+        }
+    }
+
+    /// Create SSL data message
+    pub fn create_ssl_data_message(connection_id: &str, data: Vec<u8>) -> TunnelMessage {
+        TunnelMessage::SslData {
+            id: connection_id.to_string(),
+            data,
+        }
+    }
+
+    /// Create SSL close message
+    pub fn create_ssl_close_message(connection_id: &str) -> TunnelMessage {
+        TunnelMessage::SslClose {
+            id: connection_id.to_string(),
         }
     }
 

@@ -29,13 +29,26 @@ reqwest = { workspace = true, features = ["json", "rustls-tls", "stream"] }
 # URL parsing for tunnel endpoints
 url = "2.4"
 
-# Server dependencies for Phase 7.2
-axum = { workspace = true, features = ["ws"] }
+# Additional dependencies for tunnel client example
+axum = { workspace = true, features = ["ws", "macros"] }
 tower = { workspace = true }
 tower-http = { workspace = true, features = ["cors"] }
+
+# HTTP client for forwarding requests
+hyper = { workspace = true, features = ["full"] }
+http = "1.0"
+
+# Random number generation for subdomain generation
 rand = "0.8"
 
 [dev-dependencies]
 # Test dependencies
 tempfile = "3.8"
 mockall = "0.12"
+# Testing framework
+tokio-test = "0.4"
+tracing-subscriber = "0.3"
+
+[[example]]
+name = "tunnel_client"
+path = "examples/tunnel_client.rs"

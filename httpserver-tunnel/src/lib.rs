@@ -9,6 +9,7 @@ pub mod connection;
 pub mod status;
 pub mod server;  // Phase 7.2: Tunnel Server
 pub mod protocol;  // Phase 7.3: Tunnel Protocol
+pub mod subdomain;  // Phase 7.2: Subdomain Management
 
 // Re-export main types for easy usage
 pub use client::TunnelClient;
@@ -38,6 +39,16 @@ pub enum TunnelError {
     ProtocolError(String),
     /// Tunnel server unavailable
     ServerUnavailable(String),
+    /// Internal error
+    InternalError(String),
+    /// Validation error
+    ValidationError(String),
+    /// Conflict error
+    ConflictError(String),
+    /// Serialization error
+    SerializationError(String),
+    /// IO error
+    IoError(String),
 }
 
 impl fmt::Display for TunnelError {
@@ -49,6 +60,11 @@ impl fmt::Display for TunnelError {
             TunnelError::NetworkError(msg) => write!(f, "Network error: {}", msg),
             TunnelError::ProtocolError(msg) => write!(f, "Protocol error: {}", msg),
             TunnelError::ServerUnavailable(msg) => write!(f, "Server unavailable: {}", msg),
+            TunnelError::InternalError(msg) => write!(f, "Internal error: {}", msg),
+            TunnelError::ValidationError(msg) => write!(f, "Validation error: {}", msg),
+            TunnelError::ConflictError(msg) => write!(f, "Conflict error: {}", msg),
+            TunnelError::SerializationError(msg) => write!(f, "Serialization error: {}", msg),
+            TunnelError::IoError(msg) => write!(f, "IO error: {}", msg),
         }
     }
 }

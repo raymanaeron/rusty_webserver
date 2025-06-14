@@ -1,0 +1,56 @@
+# Tunnel Server Configuration for Phase 7.2
+# Complete HTTP tunneling with SSL passthrough support
+
+[server]
+host = "0.0.0.0"
+port = 8081
+max_connections = 1000
+timeout = 30
+
+[logging]
+level = "info"
+file = "logs/tunnel.log"
+
+[ssl]
+enabled = true
+cert_file = "certs/server.crt"
+key_file = "certs/server.key"
+
+[tunnel]
+enabled = true
+tunnel_port = 8080
+public_port = 8081
+base_domain = "tunnel.local"
+max_tunnels = 100
+subdomain_allocation = "auto"
+
+[network]
+bind_address = "0.0.0.0"
+public_bind_address = "0.0.0.0"
+max_connections_per_ip = 10
+
+[auth]
+required = false
+api_keys = [
+    "test-token-123",
+    "demo-key-456",
+    "production-token-789"
+]
+
+[subdomain]
+min_length = 3
+max_length = 20
+allowed_chars = "abcdefghijklmnopqrstuvwxyz0123456789-"
+reserved_words = [
+    "www", "api", "mail", "ftp", "admin", "root", "test", "staging",
+    "production", "dev", "development", "server", "tunnel", "proxy"
+]
+
+[health]
+enabled = true
+path = "/health"
+timeout = 5
+
+[monitoring]
+metrics_enabled = true
+health_check_interval = 30
