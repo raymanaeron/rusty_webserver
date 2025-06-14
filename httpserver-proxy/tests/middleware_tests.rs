@@ -85,9 +85,7 @@ fn create_test_proxy_handler_with_middleware() -> ProxyHandler {
             threshold_bytes: 100,
             level: 6,
         }),
-    };
-
-    let routes = vec![ProxyRoute {
+    };    let routes = vec![ProxyRoute {
         path: "/api/*".to_string(),
         targets: vec![Target::new("http://localhost:3000".to_string())],
         target: None,
@@ -98,6 +96,7 @@ fn create_test_proxy_handler_with_middleware() -> ProxyHandler {
         websocket_health: None,
         circuit_breaker: None,
         middleware: Some(middleware_config),
+        ssl: None,
     }];
 
     ProxyHandler::new(routes)

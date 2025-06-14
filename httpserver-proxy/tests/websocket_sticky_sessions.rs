@@ -17,16 +17,15 @@ fn create_sticky_session_handler() -> ProxyHandler {
                 Target::new("http://localhost:5001".to_string()),
                 Target::new("http://localhost:5002".to_string())
             ],
-            target: None,
-            strategy: LoadBalancingStrategy::LeastConnections, // Best for persistent connections
+            target: None,            strategy: LoadBalancingStrategy::LeastConnections, // Best for persistent connections
             timeout: 300,
             sticky_sessions: false,
             http_health: None,
             websocket_health: None,
             circuit_breaker: None,
             middleware: None,
-        },
-        // WebSocket route for broadcast scenarios (no sticky sessions needed)
+            ssl: None,
+        },        // WebSocket route for broadcast scenarios (no sticky sessions needed)
         ProxyRoute {
             path: "/ws/broadcast/*".to_string(),
             targets: vec![
@@ -41,6 +40,7 @@ fn create_sticky_session_handler() -> ProxyHandler {
             websocket_health: None,
             circuit_breaker: None,
             middleware: None,
+            ssl: None,
         }
     ];
 
@@ -329,6 +329,7 @@ fn test_websocket_routing_edge_cases() {
         websocket_health: None,
         circuit_breaker: None,
         middleware: None,
+        ssl: None,
     }];
 
     let empty_handler = ProxyHandler::new(empty_routes);

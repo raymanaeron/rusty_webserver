@@ -1,8 +1,7 @@
 use httpserver_proxy::ProxyHandler;
 use httpserver_config::{ ProxyRoute, LoadBalancingStrategy };
 
-fn create_test_route(path: &str, target: &str) -> ProxyRoute {
-    ProxyRoute {
+fn create_test_route(path: &str, target: &str) -> ProxyRoute {    ProxyRoute {
         path: path.to_string(),
         target: Some(target.to_string()),
         targets: vec![],
@@ -13,6 +12,7 @@ fn create_test_route(path: &str, target: &str) -> ProxyRoute {
         websocket_health: None,
         circuit_breaker: None,
         middleware: None,
+        ssl: None,
     }
 }
 

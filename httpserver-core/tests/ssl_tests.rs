@@ -248,4 +248,26 @@ mod ssl_tests {
         assert!(manager.get_certificate_for_sni("example.org").is_none());
         assert!(manager.get_certificate_for_sni("sub.web.httpserver.io").is_none());
     }
+
+    #[test]
+    fn test_ssl_redirect_config() {
+        use httpserver_core::SslRedirectConfig;
+        
+        let config = SslRedirectConfig::new(true, 443);
+        assert!(config.enabled);
+        assert_eq!(config.https_port, 443);
+        assert!(config.is_exempt("/health"));
+        assert!(config.is_exempt("/ping"));
+        assert!(!config.is_exempt("/api/users"));
+        
+        // Test with custom HTTPS port
+        let custom_config = SslRedirectConfig::new(false, 8443);
+        assert!(!custom_config.enabled);
+        assert_eq!(custom_config.https_port, 8443);
+          // Test exempt path matching
+        assert!(custom_config.is_exempt("/health/check"));
+        assert!(custom_config.is_exempt("/ping/status"));
+        assert!(!custom_config.is_exempt("/api/users")); // Should not match
+        assert!(custom_config.is_exempt("/healthz")); // This SHOULD match as it starts with /health
+    }
 }

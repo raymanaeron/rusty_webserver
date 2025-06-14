@@ -58,6 +58,40 @@ max_request_size_mb = 10
 # Enable health endpoints
 enable_health_endpoints = true
 
+# SSL/TLS configuration
+[server.ssl]
+enabled = true
+https_port = 8443
+
+# Main SSL certificate files
+cert_file = "certs/server.crt"
+key_file = "certs/server.key"
+cert_chain_file = "certs/chain.pem"  # Optional certificate chain
+
+# HTTP to HTTPS redirect configuration
+[server.ssl.redirect]
+enabled = true
+exempt_paths = ["/health", "/ping", "/metrics"]  # Paths that don't require HTTPS
+
+# Wildcard certificate configuration for *.httpserver.io
+[server.ssl.wildcard]
+enabled = true
+domain = "*.httpserver.io"
+cert_file = "certs/wildcard.crt"
+key_file = "certs/wildcard.key"
+
+# Let's Encrypt integration (future implementation)
+[server.ssl.lets_encrypt]
+enabled = false
+email = "admin@httpserver.io"
+domain = "httpserver.io"
+
+# DNS challenge for wildcard certificates
+[server.ssl.lets_encrypt.dns_challenge]
+provider = "cloudflare"  # DNS provider for DNS-01 challenge
+timeout_seconds = 300
+credentials = { api_token = "${CLOUDFLARE_API_TOKEN}" }  # Environment variable
+
 # Static file serving configuration
 [static_config]
 directory = "."
@@ -127,7 +161,7 @@ remove_json_fields = ["internal_id", "debug_info"]
 [proxy.middleware.auth]
 # Add Bearer token to requests
 bearer_token = "gateway-token-12345"
-# Custom authentication header
+# Custom authentication header (tuple: header_name, header_value)
 custom_auth_header = ["X-Gateway-Auth", "gateway-secret"]
 # API key configuration
 [proxy.middleware.auth.api_key]
@@ -140,6 +174,12 @@ gzip = true
 brotli = false
 threshold_bytes = 1024  # Only compress responses larger than 1KB
 level = 6
+
+# SSL configuration for this route (backend communication)
+[proxy.ssl]
+verify_backend = true          # Verify backend SSL certificates
+client_cert_file = "certs/client.crt"    # Client certificate for backend
+client_key_file = "certs/client.key"     # Client key for backend
 
 # WebSocket Chat with Sticky Sessions and Health Checks
 [[proxy]]
@@ -237,17 +277,18 @@ rate_limit_message = "Admin access rate limit exceeded. Contact administrator."
 # Security headers
 [proxy.middleware.headers]
 request_headers = { "X-Admin-Gateway" = "true", "X-Security-Level" = "high" }
-response_headers = { 
-    "X-Frame-Options" = "DENY", 
-    "X-Content-Type-Options" = "nosniff",
-    "Strict-Transport-Security" = "max-age=31536000; includeSubDomains"
-}
+response_headers = { "X-Frame-Options" = "DENY", "X-Content-Type-Options" = "nosniff", "Strict-Transport-Security" = "max-age=31536000; includeSubDomains" }
 remove_response_headers = ["Server", "X-Powered-By"]
 
 # Admin authentication
 [proxy.middleware.auth]
 bearer_token = "admin-secure-token-98765"
-custom_auth_header = ["X-Admin-Key", "super-secret-admin-key"]
+
+# SSL configuration for admin route (enhanced security)
+[proxy.ssl]
+verify_backend = true          # Strict certificate verification for admin
+client_cert_file = "certs/admin-client.crt"    # Admin client certificate
+client_key_file = "certs/admin-client.key"     # Admin client key
 
 # Health Check Endpoint
 [[proxy]]

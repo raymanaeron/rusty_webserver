@@ -375,9 +375,13 @@ pub struct SslConfig {
     #[serde(default)]
     pub lets_encrypt: Option<LetsEncryptConfig>,
 
-    /// Force HTTPS redirect (redirect HTTP to HTTPS)
+    /// Force HTTPS redirect (redirect HTTP to HTTPS) - legacy field
     #[serde(default = "default_force_https")]
     pub force_https: bool,
+
+    /// HTTPS redirect configuration
+    #[serde(default)]
+    pub redirect: Option<SslRedirectConfig>,
 
     /// SSL protocol versions to support
     #[serde(default = "default_ssl_protocols")]
@@ -386,6 +390,18 @@ pub struct SslConfig {
     /// Cipher suites to allow (empty = use defaults)
     #[serde(default)]
     pub cipher_suites: Vec<String>,
+}
+
+/// SSL/TLS redirect configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SslRedirectConfig {
+    /// Enable HTTP to HTTPS redirection
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Paths that don't require HTTPS redirect (e.g., health checks)
+    #[serde(default)]
+    pub exempt_paths: Vec<String>,
 }
 
 /// Wildcard certificate configuration
@@ -414,6 +430,9 @@ pub struct LetsEncryptConfig {
 
     /// Email for Let's Encrypt registration
     pub email: String,
+
+    /// Domain for which to obtain certificates
+    pub domain: Option<String>,
 
     /// Use staging environment (for testing)
     #[serde(default)]

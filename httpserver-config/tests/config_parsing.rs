@@ -209,8 +209,7 @@ fn test_config_validation_invalid_proxy_route() {
         static_config: StaticConfig {
             directory: temp_dir.path().to_path_buf(),
             fallback: "index.html".to_string(),
-        },
-        proxy: vec![ProxyRoute {
+        },        proxy: vec![ProxyRoute {
             path: "".to_string(), // Invalid empty path
             target: Some("http://localhost:3000".to_string()),
             targets: Vec::new(),
@@ -219,6 +218,7 @@ fn test_config_validation_invalid_proxy_route() {
             sticky_sessions: false,
             http_health: None,
             websocket_health: None,
+            ssl: None,
             circuit_breaker: None,
             middleware: None,
         }],
@@ -239,8 +239,7 @@ fn test_config_validation_no_targets() {
         static_config: StaticConfig {
             directory: temp_dir.path().to_path_buf(),
             fallback: "index.html".to_string(),
-        },
-        proxy: vec![ProxyRoute {
+        },        proxy: vec![ProxyRoute {
             path: "/api/*".to_string(),
             target: None, // No single target
             targets: Vec::new(), // No multiple targets
@@ -249,6 +248,7 @@ fn test_config_validation_no_targets() {
             sticky_sessions: false,
             http_health: None,
             websocket_health: None,
+            ssl: None,
             circuit_breaker: None,
             middleware: None,
         }],
@@ -269,8 +269,7 @@ fn test_config_validation_invalid_url() {
         static_config: StaticConfig {
             directory: temp_dir.path().to_path_buf(),
             fallback: "index.html".to_string(),
-        },
-        proxy: vec![ProxyRoute {
+        },        proxy: vec![ProxyRoute {
             path: "/api/*".to_string(),
             target: Some("invalid-url".to_string()), // Invalid URL
             targets: Vec::new(),
@@ -279,6 +278,7 @@ fn test_config_validation_invalid_url() {
             sticky_sessions: false,
             http_health: None,
             websocket_health: None,
+            ssl: None,
             circuit_breaker: None,
             middleware: None,
         }],
@@ -306,25 +306,28 @@ fn test_proxy_route_legacy_vs_new_targets() {
         websocket_health: None,
         circuit_breaker: None,
         middleware: None,
+        ssl: None,
     };
 
     assert_eq!(legacy_route.get_primary_target().unwrap(), "http://localhost:8000");
     assert_eq!(legacy_route.get_targets().len(), 1);
-    assert!(!legacy_route.has_multiple_targets()); // Test new multiple targets
+    assert!(!legacy_route.has_multiple_targets());
+
+    // Test new multiple targets
     let new_route = ProxyRoute {
         path: "/api/*".to_string(),
         target: None,
         targets: vec![
             Target::new("http://localhost:3000".to_string()),
             Target::new("http://localhost:3001".to_string())
-        ],
-        strategy: LoadBalancingStrategy::RoundRobin,
+        ],        strategy: LoadBalancingStrategy::RoundRobin,
         timeout: 30,
         sticky_sessions: false,
         http_health: None,
         websocket_health: None,
         circuit_breaker: None,
         middleware: None,
+        ssl: None,
     };
 
     assert_eq!(new_route.get_primary_target().unwrap(), "http://localhost:3000");

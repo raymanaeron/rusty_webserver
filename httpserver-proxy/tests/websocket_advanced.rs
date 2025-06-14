@@ -4,8 +4,7 @@ use httpserver_balancer::{ Target, LoadBalancer };
 use axum::{ extract::Request, body::Body };
 
 fn create_comprehensive_websocket_handler() -> ProxyHandler {
-    let routes = vec![
-        // Multi-target WebSocket route with sticky sessions
+    let routes = vec![        // Multi-target WebSocket route with sticky sessions
         ProxyRoute {
             path: "/ws/chat/*".to_string(),
             targets: vec![
@@ -21,8 +20,8 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             websocket_health: None,
             circuit_breaker: None,
             middleware: None,
-        },
-        // WebSocket notifications with round-robin
+            ssl: None,
+        },        // WebSocket notifications with round-robin
         ProxyRoute {
             path: "/ws/notifications/*".to_string(),
             targets: vec![
@@ -37,8 +36,8 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             websocket_health: None,
             circuit_breaker: None,
             middleware: None,
-        },
-        // Weighted WebSocket route
+            ssl: None,
+        },        // Weighted WebSocket route
         ProxyRoute {
             path: "/ws/realtime/*".to_string(),
             targets: vec![
@@ -54,8 +53,8 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             websocket_health: None,
             circuit_breaker: None,
             middleware: None,
-        },
-        // Single WebSocket endpoint (legacy)
+            ssl: None,
+        },        // Single WebSocket endpoint (legacy)
         ProxyRoute {
             path: "/ws/events".to_string(),
             targets: vec![],
@@ -67,7 +66,8 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             websocket_health: None,
             circuit_breaker: None,
             middleware: None,
-        }, // HTTP route for comparison
+            ssl: None,
+        },        // HTTP route for comparison
         ProxyRoute {
             path: "/api/*".to_string(),
             targets: vec![
@@ -82,6 +82,7 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             websocket_health: None,
             circuit_breaker: None,
             middleware: None,
+            ssl: None,
         }
     ];
 

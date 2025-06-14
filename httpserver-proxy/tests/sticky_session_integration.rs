@@ -72,13 +72,13 @@ fn test_proxy_handler_sticky_sessions() {
             Target::new("http://localhost:5001".to_string())
         ],
         target: None,
-        strategy: LoadBalancingStrategy::LeastConnections,
-        timeout: 300,
+        strategy: LoadBalancingStrategy::LeastConnections,        timeout: 300,
         sticky_sessions: true,
         http_health: None,
         websocket_health: None,
         circuit_breaker: None,
         middleware: None,
+        ssl: None,
     }];
 
     let handler = ProxyHandler::new(routes);
