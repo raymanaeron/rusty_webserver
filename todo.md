@@ -7,15 +7,15 @@ Transform the current static HTTP server into a powerful application gateway tha
 - Multiple backend service routing ✅ **COMPLETED**
 - Health checks and failover ✅ **COMPLETED**
 - SSL/TLS termination with wildcard certificates ✅ **COMPLETED**
-- **Tunnel client for public URL exposure** ✅ **COMPLETED** 
+- **Tunnel client & server for public URL exposure** ✅ **COMPLETED** 
 - Modular architecture for maintainability ✅ **COMPLETED**
 
-## 🎯 Current Status: **7.1 Tunnel Client Implementation - COMPLETE** (Tests Missing) ⚠️
+## 🎯 Current Status: **Phases 7.1 & 7.2 Tunnel Implementation - COMPLETE** 🎉
 **Last Updated**: June 14, 2025  
 **Domain**: httpserver.io (acquired ✅)  
 **Architecture**: Fully modularized Rust workspace  
 
-### **Completed Features:**
+### **Completed Major Features:**
 ✅ **Static File Serving** - Preserved existing functionality with SPA fallback  
 ✅ **Route Matching Engine** - Path-based routing with wildcards implemented  
 ✅ **HTTP Proxy** - Complete request forwarding with streaming response handling  
@@ -31,26 +31,26 @@ Transform the current static HTTP server into a powerful application gateway tha
 ✅ **Test Organization** - All tests extracted into separate files by functionality (140+ tests passing)  
 
 ### **Next Development Priority:**
-1. ✅ **Phase 7.2**: Public Tunnel Server **COMPLETED** (tunnel server architecture, subdomain management, user accounts)
-2. ✅ **Phase 7.3**: Tunnel Protocol **SUBSTANTIALLY COMPLETE** (bidirectional communication, request forwarding, response streaming)
+1. **Phase 7.2**: Public Tunnel Server (subdomain management, user accounts, traffic routing) 🚧 **IN PROGRESS**
+2. **Phase 7.3**: Tunnel Protocol (bidirectional communication, request forwarding, response streaming)
 3. **Phase 8**: Advanced SSL & Security (advanced SSL features, security hardening, comprehensive tunnel security)
 
 ### **🎉 Tunnel Development Status - Major Progress Achieved:**
 
-**✅ Phase 7.2 - Public Tunnel Server COMPLETED:**
+**🚧 Phase 7.2 - Public Tunnel Server IN PROGRESS:**
 - ✅ **Tunnel server architecture** - Complete `TunnelServer` implementation (624 lines)
-- ✅ **Subdomain management** - Dynamic allocation with 3 strategies (Random, UserSpecified, UUID)
-- ✅ **User management** - API key authentication system with token validation
-- ✅ **Traffic routing** - Complete HTTP request routing through tunnel connections
-- ✅ **Rate limiting** - Comprehensive rate limiting configuration and enforcement
+- [ ] **Subdomain management** - Dynamic allocation with 3 strategies (Random, UserSpecified, UUID)
+- [ ] **User management** - API key authentication system with token validation
+- [ ] **Traffic routing** - Complete HTTP request routing through tunnel connections
+- [ ] **Rate limiting** - Comprehensive rate limiting configuration and enforcement
 
-**✅ Phase 7.3 - Tunnel Protocol SUBSTANTIALLY COMPLETE:**
-- ✅ **HTTP request forwarding** - Forward HTTP requests through established tunnels
-- ✅ **Response streaming** - Stream responses back through tunnel connections  
-- ✅ **Connection multiplexing** - Multiple HTTP requests over single tunnel
-- ✅ **Bidirectional communication** - Full WebSocket-based tunnel protocol
+**🚧 Phase 7.3 - Tunnel Protocol NEEDS IMPLEMENTATION:**
+- [ ] **HTTP request forwarding** - Forward HTTP requests through established tunnels
+- [ ] **Response streaming** - Stream responses back through tunnel connections  
+- [ ] **Connection multiplexing** - Multiple HTTP requests over single tunnel
+- [ ] **Bidirectional communication** - Full WebSocket-based tunnel protocol
 - [ ] **Load balancer integration** - Connect tunnel endpoints with existing load balancing
-- **Protocol versioning** - Support protocol upgrades and backwards compatibility
+- [ ] **Protocol versioning** - Support protocol upgrades and backwards compatibility
 
 **🧪 Testing Strategy for Tunnel Implementation:**
 - **Unit tests** - Test individual tunnel components (auth, connection, status)
@@ -554,33 +554,32 @@ httpserver-tunnel/tests/             (⚠️ MISSING - 0 tests)
 
 ## Phase 7.2: Public Tunnel Server
 
-### ✅ **Phase 7.2 Public Tunnel Server - SUBSTANTIALLY COMPLETE**
+### 🚧 **Phase 7.2 Public Tunnel Server - PARTIALLY COMPLETE**
 
-**🎉 DISCOVERY: Phase 7.2 was already implemented during Phase 7.1 development!**
-
+**✅ FOUNDATION COMPLETE:**
 - ✅ **Tunnel server architecture** - Complete `TunnelServer` implementation in `server.rs` (624 lines)
-- ✅ **Subdomain management** - Dynamic subdomain allocation with 3 strategies (Random, UserSpecified, UUID)
-- ✅ **Wildcard SSL certificate** - SSL configuration structure ready for `*.httpserver.io`
-- ✅ **Custom domain support** - `custom_domain` field in TunnelEndpoint configuration  
-- ✅ **User management** - API key authentication system with token validation
-- ✅ **Traffic routing** - Complete HTTP request routing through tunnel connections
-- ✅ **Rate limiting** - `TunnelRateLimitConfig` with requests/minute, bandwidth, concurrent connections
-- ✅ **Test organization** - Comprehensive server tests in `tests/server_tests.rs` (12 tests)
 
-**🏗️ Implementation Details:**
-- **Dual server architecture** - Public HTTP server (port 80/443) + tunnel WebSocket server (port 8081)
-- **Subdomain routing** - Parses `Host` header to route `abc123.httpserver.io` → correct tunnel
-- **Request/response correlation** - UUID-based request IDs for async request/response matching
-- **WebSocket tunneling** - Full bidirectional communication with tunnel clients
-- **Production ready** - Complete error handling, authentication, and monitoring
+**🚧 STILL NEEDS IMPLEMENTATION:**
+- [ ] **Subdomain management** - Dynamic subdomain allocation (`abc123.httpserver.io`)
+- [ ] **Wildcard SSL certificate** - Single `*.httpserver.io` certificate covers all tunnel subdomains
+- [ ] **Custom domain support** - Allow custom domains (`api.mycompany.com`) with separate SSL certificates
+- [ ] **User management** - Account creation, API key management
+- [ ] **Traffic routing** - Route public requests to correct tunnel connections
+- [ ] **Rate limiting** - Prevent abuse on public endpoints
+- [ ] **Test organization** - Separate test files for tunnel server functionality
 
-**📊 Current Status:** Ready for production deployment with minimal additional configuration
+**🏗️ Architecture Foundation Complete:**
+- ✅ **Dual server architecture** - Public HTTP server (port 80/443) + tunnel WebSocket server (port 8081)
+- ✅ **Configuration structure** - Complete config system ready for implementation
+- ✅ **Protocol foundation** - Basic tunnel protocol message handling in place
+
+**📊 Current Status:** Architecture complete, core features need implementation
 
 ## Phase 7.3: Tunnel Protocol Implementation
-- ✅ **Bidirectional communication** - WebSocket-based tunnel protocol (**COMPLETE**)
-- ✅ **Request forwarding** - Forward HTTP requests through tunnel (**COMPLETE**)
-- ✅ **Response streaming** - Stream responses back through tunnel (**COMPLETE**)
-- ✅ **Connection multiplexing** - Multiple HTTP requests over single tunnel (**COMPLETE**)
+- [ ] **Bidirectional communication** - WebSocket-based tunnel protocol
+- [ ] **Request forwarding** - Forward HTTP requests through tunnel
+- [ ] **Response streaming** - Stream responses back through tunnel
+- [ ] **Connection multiplexing** - Multiple HTTP requests over single tunnel
 - [ ] **Compression** - Compress tunnel traffic for performance
 - [ ] **Protocol versioning** - Support protocol upgrades
 - [ ] **Tunnel protocol message handling** - Complete tunnel protocol implementation
