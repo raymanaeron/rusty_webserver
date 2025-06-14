@@ -22,6 +22,7 @@ fn create_sticky_session_handler() -> ProxyHandler {
             sticky_sessions: false,
             http_health: None,
             websocket_health: None,
+            circuit_breaker: None,
         },        // WebSocket route for broadcast scenarios (no sticky sessions needed)
         ProxyRoute {
             path: "/ws/broadcast/*".to_string(),
@@ -35,6 +36,7 @@ fn create_sticky_session_handler() -> ProxyHandler {
             sticky_sessions: false,
             http_health: None,
             websocket_health: None,
+            circuit_breaker: None,
         },
     ];
     
@@ -319,6 +321,7 @@ fn test_websocket_routing_edge_cases() {    // Test with no targets configured
             sticky_sessions: false,
             http_health: None,
             websocket_health: None,
+            circuit_breaker: None,
         },
     ];
     

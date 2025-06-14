@@ -18,6 +18,7 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             sticky_sessions: false,
             http_health: None,
             websocket_health: None,
+            circuit_breaker: None,
         },        // WebSocket notifications with round-robin
         ProxyRoute {
             path: "/ws/notifications/*".to_string(),
@@ -31,6 +32,7 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             sticky_sessions: false,
             http_health: None,
             websocket_health: None,
+            circuit_breaker: None,
         },        // Weighted WebSocket route
         ProxyRoute {
             path: "/ws/realtime/*".to_string(),
@@ -45,6 +47,7 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             sticky_sessions: false,
             http_health: None,
             websocket_health: None,
+            circuit_breaker: None,
         },        // Single WebSocket endpoint (legacy)
         ProxyRoute {
             path: "/ws/events".to_string(),
@@ -55,6 +58,7 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             sticky_sessions: false,
             http_health: None,
             websocket_health: None,
+            circuit_breaker: None,
         },        // HTTP route for comparison
         ProxyRoute {
             path: "/api/*".to_string(),
@@ -68,6 +72,7 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             sticky_sessions: false,
             http_health: None,
             websocket_health: None,
+            circuit_breaker: None,
         },
     ];
     
@@ -400,3 +405,4 @@ fn test_websocket_route_balancer_integration() {
     assert!(events_match.route.get_targets().is_empty() || 
             events_match.route.get_targets().len() == 1);
 }
+

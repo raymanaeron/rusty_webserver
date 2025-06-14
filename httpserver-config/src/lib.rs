@@ -10,7 +10,7 @@ use serde_json::{json, Value};
 use tracing;
 
 // Re-export types from balancer crate
-pub use httpserver_balancer::{LoadBalancingStrategy, Target};
+pub use httpserver_balancer::{LoadBalancingStrategy, Target, CircuitBreakerConfig};
 
 /// Command line arguments
 #[derive(Parser)]
@@ -97,6 +97,10 @@ pub struct ProxyRoute {
     /// WebSocket health check configuration
     #[serde(default)]
     pub websocket_health: Option<WebSocketHealthConfig>,
+    
+    /// Circuit breaker configuration
+    #[serde(default)]
+    pub circuit_breaker: Option<CircuitBreakerConfig>,
 }
 
 /// HTTP health check configuration
@@ -434,6 +438,8 @@ impl ProxyRoute {
         Ok(())
     }
 }
+
+
 
 /// Application configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]

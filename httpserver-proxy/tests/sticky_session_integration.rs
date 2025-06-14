@@ -77,6 +77,7 @@ fn test_proxy_handler_sticky_sessions() {    // Create proxy route with sticky s
             sticky_sessions: true,
             http_health: None,
             websocket_health: None,
+            circuit_breaker: None,
         }
     ];
     
@@ -87,3 +88,4 @@ fn test_proxy_handler_sticky_sessions() {    // Create proxy route with sticky s
     assert!(route_match.route.sticky_sessions, "Sticky sessions should be enabled");
     assert_eq!(route_match.route.strategy, LoadBalancingStrategy::LeastConnections);
 }
+

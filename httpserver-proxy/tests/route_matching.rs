@@ -11,6 +11,7 @@ fn create_test_route(path: &str, target: &str) -> ProxyRoute {
         sticky_sessions: false,
         http_health: None,
         websocket_health: None,
+        circuit_breaker: None,
     }
 }
 

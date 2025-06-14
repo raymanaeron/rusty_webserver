@@ -10,6 +10,7 @@ use axum::{
 };
 use serde_json::{json, Value};
 use tracing;
+use std::time::{Duration, Instant};
 
 /// Health endpoint handler for load balancer service
 pub async fn balancer_health() -> Json<Value> {
@@ -127,6 +128,226 @@ impl ConnectionTracker {
     }
 }
 
+/// Circuit breaker states
+#[derive(Debug, Clone, PartialEq)]
+pub enum CircuitState {
+    Closed,   // Normal operation
+    Open,     // Failures exceeded threshold, blocking requests
+    HalfOpen, // Testing if service has recovered
+}
+
+/// Circuit breaker for a single target
+#[derive(Debug, Clone)]
+pub struct CircuitBreaker {
+    pub state: CircuitState,
+    pub failure_count: u32,
+    pub success_count: u32,
+    pub total_requests: u32,
+    pub last_failure_time: Option<Instant>,
+    pub state_change_time: Instant,
+    pub config: CircuitBreakerConfig,
+}
+
+impl CircuitBreaker {
+    pub fn new(config: CircuitBreakerConfig) -> Self {
+        Self {
+            state: CircuitState::Closed,
+            failure_count: 0,
+            success_count: 0,
+            total_requests: 0,
+            last_failure_time: None,
+            state_change_time: Instant::now(),
+            config,
+        }
+    }
+    
+    /// Record a successful request
+    pub fn record_success(&mut self) {
+        self.total_requests += 1;
+        
+        match self.state {
+            CircuitState::Closed => {
+                self.success_count += 1;
+                // Reset failure count on success
+                self.failure_count = 0;
+            }
+            CircuitState::HalfOpen => {
+                self.success_count += 1;
+                
+                // If we have enough successful test requests, close the circuit
+                if self.success_count >= self.config.test_requests {
+                    self.state = CircuitState::Closed;
+                    self.state_change_time = Instant::now();
+                    self.failure_count = 0;
+                    self.success_count = 0;
+                    
+                    tracing::info!(
+                        state = "closed",
+                        "Circuit breaker closed after successful test requests"
+                    );
+                }
+            }
+            CircuitState::Open => {
+                // Should not happen - requests shouldn't reach open circuit
+                tracing::warn!("Received success response while circuit is open");
+            }
+        }
+    }
+    
+    /// Record a failed request
+    pub fn record_failure(&mut self) {
+        self.total_requests += 1;
+        self.failure_count += 1;
+        self.last_failure_time = Some(Instant::now());
+        
+        match self.state {
+            CircuitState::Closed => {
+                // Check if we should open the circuit
+                if self.total_requests >= self.config.min_requests 
+                    && self.failure_count >= self.config.failure_threshold {
+                    self.state = CircuitState::Open;
+                    self.state_change_time = Instant::now();
+                    
+                    tracing::warn!(
+                        failure_count = self.failure_count,
+                        threshold = self.config.failure_threshold,
+                        "Circuit breaker opened due to failures"
+                    );
+                }
+            }
+            CircuitState::HalfOpen => {
+                // Failure during test - reopen circuit
+                self.state = CircuitState::Open;
+                self.state_change_time = Instant::now();
+                self.success_count = 0;
+                
+                tracing::warn!(
+                    "Circuit breaker reopened after failure during test"
+                );
+            }
+            CircuitState::Open => {
+                // Already open, just record the failure
+            }
+        }
+    }
+    
+    /// Check if a request should be allowed through
+    pub fn allow_request(&mut self) -> bool {
+        if !self.config.enabled {
+            return true;
+        }
+        
+        match self.state {
+            CircuitState::Closed => true,
+            CircuitState::Open => {
+                // Check if we should transition to half-open
+                let time_since_open = self.state_change_time.elapsed();
+                if time_since_open >= Duration::from_secs(self.config.open_timeout) {
+                    self.state = CircuitState::HalfOpen;
+                    self.state_change_time = Instant::now();
+                    self.success_count = 0;
+                    
+                    tracing::info!(
+                        "Circuit breaker transitioned to half-open for testing"
+                    );
+                    
+                    true
+                } else {
+                    false
+                }
+            }
+            CircuitState::HalfOpen => {
+                // Allow limited test requests
+                self.success_count < self.config.test_requests
+            }
+        }
+    }
+    
+    /// Get current circuit breaker statistics
+    pub fn get_stats(&self) -> CircuitBreakerStats {
+        CircuitBreakerStats {
+            state: self.state.clone(),
+            failure_count: self.failure_count,
+            success_count: self.success_count,
+            total_requests: self.total_requests,
+            last_failure_time: self.last_failure_time,
+            state_change_time: self.state_change_time,
+        }
+    }
+}
+
+/// Circuit breaker statistics for monitoring
+#[derive(Debug, Clone)]
+pub struct CircuitBreakerStats {
+    pub state: CircuitState,
+    pub failure_count: u32,
+    pub success_count: u32,
+    pub total_requests: u32,
+    pub last_failure_time: Option<Instant>,
+    pub state_change_time: Instant,
+}
+
+/// Circuit breaker configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CircuitBreakerConfig {
+    /// Enable circuit breaker functionality
+    #[serde(default)]
+    pub enabled: bool,
+    
+    /// Failure threshold to trigger circuit open (default: 5)
+    #[serde(default = "default_failure_threshold")]
+    pub failure_threshold: u32,
+    
+    /// Time window in seconds for failure counting (default: 60)
+    #[serde(default = "default_failure_window")]
+    pub failure_window: u64,
+    
+    /// Duration in seconds to keep circuit open (default: 30)
+    #[serde(default = "default_open_timeout")]
+    pub open_timeout: u64,
+    
+    /// Number of test requests in half-open state (default: 3)
+    #[serde(default = "default_test_requests")]
+    pub test_requests: u32,
+    
+    /// Minimum requests before circuit breaker activates (default: 10)
+    #[serde(default = "default_min_requests")]
+    pub min_requests: u32,
+}
+
+impl Default for CircuitBreakerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            failure_threshold: default_failure_threshold(),
+            failure_window: default_failure_window(),
+            open_timeout: default_open_timeout(),
+            test_requests: default_test_requests(),
+            min_requests: default_min_requests(),
+        }
+    }
+}
+
+fn default_failure_threshold() -> u32 {
+    5 // 5 failures trigger circuit open
+}
+
+fn default_failure_window() -> u64 {
+    60 // 60 seconds
+}
+
+fn default_open_timeout() -> u64 {
+    30 // 30 seconds
+}
+
+fn default_test_requests() -> u32 {
+    3 // 3 test requests in half-open state
+}
+
+fn default_min_requests() -> u32 {
+    10 // minimum 10 requests before circuit breaker activates
+}
+
 /// Load balancer that manages target selection
 pub struct LoadBalancer {
     targets: Vec<Target>,
@@ -141,6 +362,8 @@ pub struct LoadBalancer {
     sticky_sessions: Arc<Mutex<HashMap<u64, String>>>,
     /// Dynamic health status tracking (overrides target.healthy)
     health_status: Arc<Mutex<HashMap<String, bool>>>,
+    /// Circuit breakers for targets
+    circuit_breakers: Arc<Mutex<HashMap<String, CircuitBreaker>>>,
 }
 
 // Implement Send and Sync for LoadBalancer since all its fields are thread-safe
@@ -189,6 +412,7 @@ impl LoadBalancer {
             connection_tracker: Arc::new(Mutex::new(ConnectionTracker::new())),
             sticky_sessions: Arc::new(Mutex::new(HashMap::new())),
             health_status: Arc::new(Mutex::new(HashMap::new())),
+            circuit_breakers: Arc::new(Mutex::new(HashMap::new())),
         }
     }
     
@@ -416,5 +640,102 @@ impl LoadBalancer {
         let client_hash = self.hash_client_id(client_id);
         let sticky_sessions = self.sticky_sessions.lock().unwrap();
         sticky_sessions.get(&client_hash).cloned()
+    }
+    
+    /// Initialize circuit breaker for a target
+    pub fn initialize_circuit_breaker(&self, target_url: &str, config: CircuitBreakerConfig) {
+        let mut circuit_breakers = self.circuit_breakers.lock().unwrap();
+        circuit_breakers.insert(target_url.to_string(), CircuitBreaker::new(config.clone()));
+        
+        tracing::info!(
+            target_url = %target_url,
+            enabled = config.enabled,
+            failure_threshold = config.failure_threshold,
+            "Circuit breaker initialized for target"
+        );
+    }
+    
+    /// Check if a request to a target should be allowed (circuit breaker check)
+    pub fn allow_request(&self, target_url: &str) -> bool {
+        let mut circuit_breakers = self.circuit_breakers.lock().unwrap();
+        
+        if let Some(circuit_breaker) = circuit_breakers.get_mut(target_url) {
+            circuit_breaker.allow_request()
+        } else {
+            // No circuit breaker configured - allow request
+            true
+        }
+    }
+    
+    /// Record a successful request for circuit breaker
+    pub fn record_success(&self, target_url: &str) {
+        let mut circuit_breakers = self.circuit_breakers.lock().unwrap();
+        
+        if let Some(circuit_breaker) = circuit_breakers.get_mut(target_url) {
+            circuit_breaker.record_success();
+            
+            tracing::debug!(
+                target_url = %target_url,
+                state = ?circuit_breaker.state,
+                success_count = circuit_breaker.success_count,
+                "Circuit breaker recorded success"
+            );
+        }
+    }
+    
+    /// Record a failed request for circuit breaker
+    pub fn record_failure(&self, target_url: &str) {
+        let mut circuit_breakers = self.circuit_breakers.lock().unwrap();
+        
+        if let Some(circuit_breaker) = circuit_breakers.get_mut(target_url) {
+            circuit_breaker.record_failure();
+            
+            tracing::warn!(
+                target_url = %target_url,
+                state = ?circuit_breaker.state,
+                failure_count = circuit_breaker.failure_count,
+                "Circuit breaker recorded failure"
+            );
+        }
+    }
+    
+    /// Get circuit breaker statistics for monitoring
+    pub fn get_circuit_breaker_stats(&self, target_url: &str) -> Option<CircuitBreakerStats> {
+        let circuit_breakers = self.circuit_breakers.lock().unwrap();
+        circuit_breakers.get(target_url).map(|cb| cb.get_stats())
+    }
+    
+    /// Get all circuit breaker statistics
+    pub fn get_all_circuit_breaker_stats(&self) -> HashMap<String, CircuitBreakerStats> {
+        let circuit_breakers = self.circuit_breakers.lock().unwrap();
+        circuit_breakers.iter()
+            .map(|(url, cb)| (url.clone(), cb.get_stats()))
+            .collect()
+    }
+    
+    /// Enhanced target selection that respects circuit breaker state
+    pub fn select_target_with_circuit_breaker(&self) -> Option<&Target> {
+        let available_targets: Vec<&Target> = self.targets.iter()
+            .filter(|target| {
+                // Target must be healthy AND circuit breaker must allow requests
+                self.is_target_healthy(target) && self.allow_request(&target.url)
+            })
+            .collect();
+            
+        if available_targets.is_empty() {
+            tracing::warn!("No available targets (all unhealthy or circuit breakers open)");
+            return None;
+        }
+        
+        // Use existing load balancing logic on filtered targets
+        match self.strategy {
+            LoadBalancingStrategy::RoundRobin => self.round_robin_select(&available_targets),
+            LoadBalancingStrategy::WeightedRoundRobin => {
+                // For weighted, we need to revert to simple round-robin if circuit breakers filter targets
+                self.round_robin_select(&available_targets)
+            },
+            LoadBalancingStrategy::Random => self.random_select(&available_targets),
+            LoadBalancingStrategy::LeastConnections => self.least_connections_select(&available_targets),
+        }
     }
 }
