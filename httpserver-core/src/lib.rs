@@ -13,6 +13,12 @@ use tower_http::cors::CorsLayer;
 use serde_json::json;
 use tracing::{ info, error, instrument, Instrument };
 use std::sync::Arc;
+use hyper::server::conn::http1;
+use hyper_util::rt::TokioIo;
+use hyper_util::service::TowerToHyperService;
+use tokio::net::TcpListener;
+use tokio_rustls::TlsAcceptor;
+use tower::Service;
 
 // Export logging functionality
 pub mod logging;
@@ -92,11 +98,11 @@ impl Server {
         let https_task = if
             let (Some(ssl_config), Some(https_port)) = (self.ssl_config, self.https_port)
         {
-            let _app = app.clone();
+            let app = app.clone();
             Some(
                 tokio::spawn(async move {
-                    let _listener = match
-                        tokio::net::TcpListener::bind(format!("0.0.0.0:{}", https_port)).await
+                    let listener = match
+                        TcpListener::bind(format!("0.0.0.0:{}", https_port)).await
                     {
                         Ok(listener) => listener,
                         Err(e) => {
@@ -111,15 +117,54 @@ impl Server {
                         https_port
                     );
 
-                    let _tls_acceptor = tokio_rustls::TlsAcceptor::from(ssl_config);
+                    let tls_acceptor = TlsAcceptor::from(ssl_config);
+                    let service = app.into_make_service_with_connect_info::<SocketAddr>();
 
-                    // For now, use a simplified HTTPS approach
-                    // TODO: Implement full hyper integration for HTTPS in a future update
-                    info!(
-                        "HTTPS server configured but simplified implementation - full TLS integration coming soon"
-                    );
+                    loop {
+                        let (tcp_stream, remote_addr) = match listener.accept().await {
+                            Ok(conn) => conn,
+                            Err(e) => {
+                                error!(error = %e, "Failed to accept HTTPS connection");
+                                continue;
+                            }
+                        };
 
-                    // Return success for now - this allows the server to start with SSL config
+                        let tls_acceptor = tls_acceptor.clone();
+                        let mut service = service.clone();
+
+                        tokio::spawn(async move {
+                            // Perform TLS handshake
+                            let tls_stream = match tls_acceptor.accept(tcp_stream).await {
+                                Ok(tls_stream) => tls_stream,
+                                Err(e) => {
+                                    error!(error = %e, remote_addr = %remote_addr, "TLS handshake failed");
+                                    return;
+                                }
+                            };
+
+                            let io = TokioIo::new(tls_stream);
+                            let hyper_service = match service.call(remote_addr).await {
+                                Ok(service) => service,
+                                Err(e) => {
+                                    error!(error = %e, "Failed to create service");
+                                    return;
+                                }
+                            };
+
+                            // Wrap the axum service for hyper compatibility
+                            let hyper_service = TowerToHyperService::new(hyper_service);
+
+                            // Serve the connection using HTTP/1.1
+                            if let Err(e) = http1::Builder::new()
+                                .serve_connection(io, hyper_service)
+                                .await
+                            {
+                                error!(error = %e, remote_addr = %remote_addr, "HTTPS connection error");
+                            }
+                        });
+                    }
+
+                    #[allow(unreachable_code)]
                     Ok::<(), Box<dyn std::error::Error + Send + Sync>>(())
                 })
             )
