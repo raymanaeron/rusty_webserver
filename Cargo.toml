@@ -40,6 +40,11 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 tracing-appender = "0.2"
 uuid = { version = "1.0", features = ["v4"] }
 
+# Phase 5.1 - Middleware Support
+base64 = "0.21"
+regex = "1.10"
+flate2 = "1.0"
+
 # Safer release profile for macOS app bundles
 # Avoids aggressive optimizations that can cause crashes with WebView/FFI
 [profile.release]

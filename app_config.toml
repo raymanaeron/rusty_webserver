@@ -66,7 +66,7 @@ fallback = "index.html"
 # Proxy Routes Configuration
 # Multiple routes can be defined for different use cases
 
-# API Routes with Load Balancing
+# API Routes with Load Balancing and Middleware
 [[proxy]]
 path = "/api/*"
 strategy = "round_robin"
@@ -76,6 +76,70 @@ targets = [
     { url = "http://localhost:3001", weight = 1 },
     { url = "http://localhost:3002", weight = 1 }
 ]
+
+# Middleware configuration for API routes
+[proxy.middleware]
+# Header injection and modification
+[proxy.middleware.headers]
+# Headers to add to requests before forwarding to backend
+request_headers = { "X-Gateway" = "RustyWebServer", "X-Request-Source" = "gateway" }
+# Headers to add to responses before returning to client
+response_headers = { "X-Powered-By" = "RustyWebServer", "X-Cache-Control" = "no-cache" }
+# Headers to remove from requests
+remove_request_headers = ["X-Internal-Debug"]
+# Headers to remove from responses  
+remove_response_headers = ["Server", "X-Internal-Info"]
+# Override the Host header for backend requests
+override_host = "api.backend.com"
+
+# Rate limiting configuration
+[proxy.middleware.rate_limit]
+requests_per_minute = 1000
+window_seconds = 60
+max_concurrent = 50
+rate_limit_message = "API rate limit exceeded. Please try again later."
+
+# Request/response transformation
+[proxy.middleware.transform]
+# Request transformations
+[proxy.middleware.transform.request]
+# Simple text replacements in request body
+replace_text = [
+    { find = "old_api_version", replace = "v2", regex_enabled = false }
+]
+# Add fields to JSON request body
+add_json_fields = { "gateway_timestamp" = "2025-06-13T10:00:00Z", "processed_by" = "gateway" }
+# Remove sensitive fields from JSON request body
+remove_json_fields = ["client_secret", "internal_token"]
+
+# Response transformations
+[proxy.middleware.transform.response]
+# Text replacements in response body
+replace_text = [
+    { find = "internal.example.com", replace = "api.example.com", regex_enabled = false }
+]
+# Add fields to JSON response body
+add_json_fields = { "response_processed_by" = "gateway", "cache_hint" = "no-cache" }
+# Remove internal fields from JSON response body
+remove_json_fields = ["internal_id", "debug_info"]
+
+# Authentication middleware
+[proxy.middleware.auth]
+# Add Bearer token to requests
+bearer_token = "gateway-token-12345"
+# Custom authentication header
+custom_auth_header = ["X-Gateway-Auth", "gateway-secret"]
+# API key configuration
+[proxy.middleware.auth.api_key]
+header_name = "X-API-Key"
+key_value = "backend-api-key-67890"
+
+# Response compression
+[proxy.middleware.compression]
+gzip = true
+brotli = false
+threshold_bytes = 1024  # Only compress responses larger than 1KB
+level = 6
 
 # WebSocket Chat with Sticky Sessions and Health Checks
 [[proxy]]
@@ -155,11 +219,35 @@ targets = [
     { url = "http://localhost:6001", weight = 1 }
 ]
 
-# Admin Routes (Single Target)
+# Admin Routes (Single Target) with Security Middleware
 [[proxy]]
 path = "/admin/*"
 target = "http://localhost:9000"
 timeout = 60
+
+# Enhanced security middleware for admin routes
+[proxy.middleware]
+# Strict rate limiting for admin access
+[proxy.middleware.rate_limit]
+requests_per_minute = 60  # Stricter limit for admin
+window_seconds = 60
+max_concurrent = 5        # Low concurrent limit
+rate_limit_message = "Admin access rate limit exceeded. Contact administrator."
+
+# Security headers
+[proxy.middleware.headers]
+request_headers = { "X-Admin-Gateway" = "true", "X-Security-Level" = "high" }
+response_headers = { 
+    "X-Frame-Options" = "DENY", 
+    "X-Content-Type-Options" = "nosniff",
+    "Strict-Transport-Security" = "max-age=31536000; includeSubDomains"
+}
+remove_response_headers = ["Server", "X-Powered-By"]
+
+# Admin authentication
+[proxy.middleware.auth]
+bearer_token = "admin-secure-token-98765"
+custom_auth_header = ["X-Admin-Key", "super-secret-admin-key"]
 
 # Health Check Endpoint
 [[proxy]]

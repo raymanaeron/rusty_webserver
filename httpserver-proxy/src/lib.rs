@@ -20,9 +20,13 @@ pub mod websocket_health;
 pub mod http_health;
 pub mod health_integration;
 
+// Middleware module for request/response processing
+pub mod middleware;
+
 pub use websocket_health::{WebSocketHealthChecker, WebSocketHealthMonitor};
 pub use http_health::{HttpHealthChecker, HttpHealthMonitor};
 pub use health_integration::{HealthCheckIntegration, HealthSummary};
+pub use middleware::{MiddlewareProcessor, MiddlewareError};
 
 /// Route matching engine for reverse proxy
 pub struct RouteMatch {
@@ -180,6 +184,8 @@ pub struct ProxyHandler {
     forwarder: ProxyForwarder,
     /// Load balancers per route (keyed by route path)
     load_balancers: HashMap<String, LoadBalancer>,
+    /// Middleware processor for request/response transformations
+    middleware_processor: MiddlewareProcessor,
 }
 
 impl ProxyHandler {
@@ -187,6 +193,7 @@ impl ProxyHandler {
     pub fn new(routes: Vec<ProxyRoute>) -> Self {
         let route_matcher = RouteMatcher::new(routes.clone());
         let forwarder = ProxyForwarder::new();
+        let middleware_processor = MiddlewareProcessor::new();
         
         // Create load balancers for each route
         let mut load_balancers = HashMap::new();
@@ -202,6 +209,7 @@ impl ProxyHandler {
             route_matcher,
             forwarder,
             load_balancers,
+            middleware_processor,
         }
     }
     
@@ -223,7 +231,7 @@ impl ProxyHandler {
     /// Handle a proxy request (find route and forward if matched)
     pub async fn handle_request(
         &self,
-        req: Request<Body>,
+        mut req: Request<Body>,
         client_ip: SocketAddr,
     ) -> Option<Result<Response<Body>, ProxyError>> {
         // Extract path for route matching
@@ -231,6 +239,19 @@ impl ProxyHandler {
         
         // Find matching route
         if let Some(route_match) = self.find_route(path) {
+            // Apply request middleware if configured
+            if let Some(middleware_config) = &route_match.route.middleware {
+                match self.middleware_processor.process_request(req, &client_ip, middleware_config).await {
+                    Ok(processed_req) => {
+                        req = processed_req;
+                    }
+                    Err(middleware_error) => {
+                        self.middleware_processor.finish_connection(&client_ip);
+                        return Some(Err(ProxyError::RequestFailed(middleware_error.to_string())));
+                    }
+                }
+            }
+            
             // Get the load balancer for this route
             if let Some(load_balancer) = self.load_balancers.get(&route_match.route.path) {
                 // Check if this is a WebSocket request that should use sticky sessions
@@ -256,16 +277,56 @@ impl ProxyHandler {
                     // Track request end
                     load_balancer.end_request(&target.url);
                     
-                    Some(result)
+                    // Apply response middleware if configured and request was successful
+                    let final_result = match result {
+                        Ok(response) => {
+                            if let Some(middleware_config) = &route_match.route.middleware {
+                                match self.middleware_processor.process_response(response, middleware_config).await {
+                                    Ok(processed_response) => Ok(processed_response),
+                                    Err(middleware_error) => Err(ProxyError::ResponseError(middleware_error.to_string())),
+                                }
+                            } else {
+                                Ok(response)
+                            }
+                        }
+                        Err(e) => Err(e),
+                    };
+                    
+                    // Finish connection tracking for rate limiting
+                    self.middleware_processor.finish_connection(&client_ip);
+                    
+                    Some(final_result)
                 } else {
                     // No healthy targets available
+                    self.middleware_processor.finish_connection(&client_ip);
                     Some(Err(ProxyError::ConnectionFailed("No healthy targets available".to_string())))
                 }
             } else {
                 // Fallback to legacy single target mode
                 if let Some(target_url) = route_match.route.get_primary_target() {
-                    Some(self.forwarder.forward_request_legacy(req, &route_match, &target_url, client_ip).await)
+                    let result = self.forwarder.forward_request_legacy(req, &route_match, &target_url, client_ip).await;
+                    
+                    // Apply response middleware if configured and request was successful
+                    let final_result = match result {
+                        Ok(response) => {
+                            if let Some(middleware_config) = &route_match.route.middleware {
+                                match self.middleware_processor.process_response(response, middleware_config).await {
+                                    Ok(processed_response) => Ok(processed_response),
+                                    Err(middleware_error) => Err(ProxyError::ResponseError(middleware_error.to_string())),
+                                }
+                            } else {
+                                Ok(response)
+                            }
+                        }
+                        Err(e) => Err(e),
+                    };
+                    
+                    // Finish connection tracking for rate limiting
+                    self.middleware_processor.finish_connection(&client_ip);
+                    
+                    Some(final_result)
                 } else {
+                    self.middleware_processor.finish_connection(&client_ip);
                     Some(Err(ProxyError::InvalidUrl("No target configured for route".to_string())))
                 }
             }

@@ -101,6 +101,10 @@ pub struct ProxyRoute {
     /// Circuit breaker configuration
     #[serde(default)]
     pub circuit_breaker: Option<CircuitBreakerConfig>,
+    
+    /// Middleware configuration for this route
+    #[serde(default)]
+    pub middleware: Option<MiddlewareConfig>,
 }
 
 /// HTTP health check configuration
@@ -161,6 +165,219 @@ pub struct WebSocketHealthConfig {
     /// Ping message to send for WebSocket health checks
     #[serde(default = "default_ping_message")]
     pub ping_message: String,
+}
+
+/// Middleware configuration for request/response processing
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MiddlewareConfig {
+    /// Header injection configuration
+    #[serde(default)]
+    pub headers: Option<HeaderMiddlewareConfig>,
+    
+    /// Rate limiting configuration
+    #[serde(default)]
+    pub rate_limit: Option<RateLimitConfig>,
+    
+    /// Request/response transformation configuration
+    #[serde(default)]
+    pub transform: Option<TransformConfig>,
+    
+    /// Authentication middleware configuration
+    #[serde(default)]
+    pub auth: Option<AuthMiddlewareConfig>,
+    
+    /// Compression middleware configuration
+    #[serde(default)]
+    pub compression: Option<CompressionConfig>,
+}
+
+/// Header injection and modification middleware
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HeaderMiddlewareConfig {
+    /// Headers to add to requests before forwarding to backend
+    #[serde(default)]
+    pub request_headers: std::collections::HashMap<String, String>,
+    
+    /// Headers to add to responses before returning to client
+    #[serde(default)]
+    pub response_headers: std::collections::HashMap<String, String>,
+    
+    /// Headers to remove from requests before forwarding
+    #[serde(default)]
+    pub remove_request_headers: Vec<String>,
+    
+    /// Headers to remove from responses before returning
+    #[serde(default)]
+    pub remove_response_headers: Vec<String>,
+    
+    /// Override the Host header for backend requests
+    #[serde(default)]
+    pub override_host: Option<String>,
+}
+
+/// Rate limiting configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RateLimitConfig {
+    /// Maximum requests per minute per client IP
+    #[serde(default = "default_requests_per_minute")]
+    pub requests_per_minute: u32,
+    
+    /// Rate limit window in seconds
+    #[serde(default = "default_rate_window")]
+    pub window_seconds: u32,
+    
+    /// Maximum concurrent requests per client IP
+    #[serde(default = "default_max_concurrent")]
+    pub max_concurrent: u32,
+    
+    /// Rate limit by header value (e.g., API key, user ID)
+    #[serde(default)]
+    pub limit_by_header: Option<String>,
+    
+    /// Custom rate limit response message
+    #[serde(default = "default_rate_limit_message")]
+    pub rate_limit_message: String,
+}
+
+/// Request/response transformation configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TransformConfig {
+    /// Request body transformations
+    #[serde(default)]
+    pub request: Option<RequestTransformConfig>,
+    
+    /// Response body transformations
+    #[serde(default)]
+    pub response: Option<ResponseTransformConfig>,
+}
+
+/// Request transformation configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RequestTransformConfig {
+    /// Replace text in request body
+    #[serde(default)]
+    pub replace_text: Vec<TextReplacement>,
+    
+    /// Add fields to JSON request body
+    #[serde(default)]
+    pub add_json_fields: std::collections::HashMap<String, serde_json::Value>,
+    
+    /// Remove fields from JSON request body
+    #[serde(default)]
+    pub remove_json_fields: Vec<String>,
+}
+
+/// Response transformation configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResponseTransformConfig {
+    /// Replace text in response body
+    #[serde(default)]
+    pub replace_text: Vec<TextReplacement>,
+    
+    /// Add fields to JSON response body
+    #[serde(default)]
+    pub add_json_fields: std::collections::HashMap<String, serde_json::Value>,
+    
+    /// Remove fields from JSON response body
+    #[serde(default)]
+    pub remove_json_fields: Vec<String>,
+}
+
+/// Text replacement configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TextReplacement {
+    /// Pattern to find (supports regex if regex_enabled is true)
+    pub find: String,
+    
+    /// Replacement text
+    pub replace: String,
+    
+    /// Whether to use regex for pattern matching
+    #[serde(default)]
+    pub regex_enabled: bool,
+}
+
+/// Authentication middleware configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthMiddlewareConfig {
+    /// Bearer token to add to requests
+    #[serde(default)]
+    pub bearer_token: Option<String>,
+    
+    /// Basic auth credentials (username:password)
+    #[serde(default)]
+    pub basic_auth: Option<String>,
+    
+    /// Custom authentication header name and value
+    #[serde(default)]
+    pub custom_auth_header: Option<(String, String)>,
+    
+    /// API key header configuration
+    #[serde(default)]
+    pub api_key: Option<ApiKeyConfig>,
+}
+
+/// API key configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApiKeyConfig {
+    /// Header name for API key
+    pub header_name: String,
+    
+    /// API key value
+    pub key_value: String,
+}
+
+/// Compression middleware configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CompressionConfig {
+    /// Enable gzip compression
+    #[serde(default = "default_gzip_enabled")]
+    pub gzip: bool,
+    
+    /// Enable brotli compression
+    #[serde(default = "default_brotli_enabled")]
+    pub brotli: bool,
+    
+    /// Minimum response size to compress (in bytes)
+    #[serde(default = "default_compression_threshold")]
+    pub threshold_bytes: usize,
+    
+    /// Compression level (1-9 for gzip, 1-11 for brotli)
+    #[serde(default = "default_compression_level")]
+    pub level: u32,
+}
+
+// Default value functions for middleware configuration
+fn default_requests_per_minute() -> u32 {
+    100
+}
+
+fn default_rate_window() -> u32 {
+    60
+}
+
+fn default_max_concurrent() -> u32 {
+    10
+}
+
+fn default_rate_limit_message() -> String {
+    "Rate limit exceeded. Please try again later.".to_string()
+}
+
+fn default_gzip_enabled() -> bool {
+    true
+}
+
+fn default_brotli_enabled() -> bool {
+    false
+}
+
+fn default_compression_threshold() -> usize {
+    1024 // 1KB
+}
+
+fn default_compression_level() -> u32 {
+    6 // Balanced compression level
 }
 
 /// Logging configuration

@@ -4,7 +4,8 @@ use httpserver_balancer::{Target, LoadBalancer};
 use axum::{extract::Request, body::Body};
 
 fn create_comprehensive_websocket_handler() -> ProxyHandler {
-    let routes = vec![        // Multi-target WebSocket route with sticky sessions
+    let routes = vec![
+        // Multi-target WebSocket route with sticky sessions
         ProxyRoute {
             path: "/ws/chat/*".to_string(),
             targets: vec![
@@ -19,7 +20,9 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             http_health: None,
             websocket_health: None,
             circuit_breaker: None,
-        },        // WebSocket notifications with round-robin
+            middleware: None,
+        },
+        // WebSocket notifications with round-robin
         ProxyRoute {
             path: "/ws/notifications/*".to_string(),
             targets: vec![
@@ -33,7 +36,9 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             http_health: None,
             websocket_health: None,
             circuit_breaker: None,
-        },        // Weighted WebSocket route
+            middleware: None,
+        },
+        // Weighted WebSocket route
         ProxyRoute {
             path: "/ws/realtime/*".to_string(),
             targets: vec![
@@ -48,7 +53,9 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             http_health: None,
             websocket_health: None,
             circuit_breaker: None,
-        },        // Single WebSocket endpoint (legacy)
+            middleware: None,
+        },
+        // Single WebSocket endpoint (legacy)
         ProxyRoute {
             path: "/ws/events".to_string(),
             targets: vec![],
@@ -56,9 +63,9 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 300,
             sticky_sessions: false,
-            http_health: None,
-            websocket_health: None,
+            http_health: None,            websocket_health: None,
             circuit_breaker: None,
+            middleware: None,
         },        // HTTP route for comparison
         ProxyRoute {
             path: "/api/*".to_string(),
@@ -70,9 +77,9 @@ fn create_comprehensive_websocket_handler() -> ProxyHandler {
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 30,
             sticky_sessions: false,
-            http_health: None,
-            websocket_health: None,
+            http_health: None,            websocket_health: None,
             circuit_breaker: None,
+            middleware: None,
         },
     ];
     

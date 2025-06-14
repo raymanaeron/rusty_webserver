@@ -14,9 +14,9 @@ fn create_test_proxy_handler() -> ProxyHandler {
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 30,
             sticky_sessions: false,
-            http_health: None,
-            websocket_health: None,
+            http_health: None,            websocket_health: None,
             circuit_breaker: None,
+            middleware: None,
         },        ProxyRoute {
             path: "/api/websocket".to_string(),
             targets: vec![],
@@ -24,9 +24,9 @@ fn create_test_proxy_handler() -> ProxyHandler {
             strategy: LoadBalancingStrategy::RoundRobin,
             timeout: 30,
             sticky_sessions: false,
-            http_health: None,
-            websocket_health: None,
+            http_health: None,            websocket_health: None,
             circuit_breaker: None,
+            middleware: None,
         },
     ];
     
