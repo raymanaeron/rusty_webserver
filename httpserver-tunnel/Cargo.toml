@@ -34,3 +34,8 @@ axum = { workspace = true, features = ["ws"] }
 tower = { workspace = true }
 tower-http = { workspace = true, features = ["cors"] }
 rand = "0.8"
+
+[dev-dependencies]
+# Test dependencies
+tempfile = "3.8"
+mockall = "0.12"
