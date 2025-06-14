@@ -8,7 +8,7 @@ Transform the current static HTTP server into a powerful application gateway tha
 - Health checks and failover
 - Modular architecture for maintainability ✅ **COMPLETED**
 
-## 🎯 Current Status: **Phase 5.1 Request/Response Middleware Complete** ✅
+## 🎯 Current Status: **5.1 Request/Response Middleware - COMPLETE** ✅
 **Last Updated**: June 13, 2025  
 **Domain**: httpserver.io (acquired ✅)  
 **Architecture**: Fully modularized Rust workspace  
@@ -225,11 +225,11 @@ rusty_webserver/
 - ✅ **Backward compatibility** - CLI arguments still override config settings
 
 **Next development session should focus on:**
-1. **Phase 5.2**: Advanced SSL features (SNI support, certificate hot-reload)
-2. **Phase 5.3**: Enterprise features (metrics endpoint, admin API, configuration hot-reload)
-3. **Phase 6**: Performance optimization and caching strategies
+1. **Phase 6**: SSL Foundation (essential SSL termination and certificate management for tunnels) - **TUNNEL PREREQUISITES**
+2. **Phase 7**: Public Tunnel Service (tunnel client integration, WebSocket tunneling, SSL-enabled public endpoints)
+3. **Phase 8**: Advanced SSL & Security (advanced SSL features, security hardening, comprehensive tunnel security)
 
-### ✅ **Phase 5.1 Complete (Current Session)**
+### ✅ **5.1 Request/Response Middleware - COMPLETE (Current Session)**
 **What was done:**
 - Implemented comprehensive request/response middleware system with 5 middleware types
 - Added `MiddlewareConfig` structure to configuration system with full TOML support
@@ -473,17 +473,9 @@ rusty_webserver/
 - **Enhanced**: Configuration system with `CircuitBreakerConfig` struct
 - **Resolved**: Circular dependency issues between config and balancer crates
 
-### 4.4 SSL/TLS Support (HARDEST)
-- [ ] **SSL termination** - Handle HTTPS at the gateway, forward HTTP to backends
-- [ ] **Certificate management** - Load cert/key files from filesystem
-- [ ] **HTTP to HTTPS redirect** - Automatic redirect for SSL-enabled routes
-- [ ] **Backend SSL support** - Option to forward HTTPS to backends
-- [ ] **Let's Encrypt integration** - Automatic certificate generation/renewal
-- [ ] **SSL configuration** - Per-route SSL settings and certificate selection
-
 ## Phase 5: Advanced Features
 
-### ✅ **Phase 5.1 Complete - Request/Response Middleware**
+### ✅ **5.1 Request/Response Middleware - COMPLETE**
 - ✅ **Header injection** - Add custom headers to requests/responses
 - ✅ **Request modification** - Modify requests before forwarding
 - ✅ **Response modification** - Modify responses before returning
@@ -504,53 +496,40 @@ rusty_webserver/
 - **Error Handling**: Comprehensive error types and proper middleware error propagation
 - **Integration**: Seamless integration with existing proxy handler and load balancing
 
-### 5.1 Request/Response Middleware
-- ✅ **Header injection** - Add custom headers to requests/responses
-- ✅ **Request modification** - Modify requests before forwarding
-- ✅ **Response modification** - Modify responses before returning
-- ✅ **Authentication headers** - Add auth headers for backend services
-- ✅ **Rate limiting** - Per-route and per-client rate limiting
-- ✅ **Request/response compression** - Gzip/Brotli compression support
-- ✅ **Test organization** - Separate test files for middleware functionality
+## Phase 6: SSL Foundation (Tunnel Prerequisites)
 
-### 5.2 Advanced SSL Features
-- [ ] **SNI support** - Server Name Indication for multiple domains
-- [ ] **SSL passthrough** - Forward encrypted traffic without termination
-- [ ] **Certificate hot-reload** - Reload certificates without restart
-- [ ] **OCSP stapling** - Online Certificate Status Protocol
-- [ ] **TLS 1.3 support** - Latest TLS protocol support
+### 6.1 SSL/TLS Support (Essential for Tunnels)
+- [ ] **SSL termination** - Handle HTTPS at the gateway, forward HTTP to backends
+- [ ] **Certificate management** - Load cert/key files from filesystem
+- [ ] **Wildcard certificate support** - Single `*.httpserver.io` certificate for all tunnel subdomains
+- [ ] **Let's Encrypt wildcard integration** - Automatic wildcard certificate generation/renewal via DNS-01 challenge
+- [ ] **SSL configuration** - Per-route SSL settings and certificate selection
+- [ ] **HTTP to HTTPS redirect** - Automatic redirect for SSL-enabled routes
+- [ ] **Backend SSL support** - Option to forward HTTPS to backends
 - [ ] **Test organization** - Separate test files for SSL functionality
 
-### 5.3 Enterprise Features
-- [ ] **Metrics endpoint** - Prometheus-compatible metrics
-- [ ] **Admin API** - REST API for configuration and monitoring
-- [ ] **Configuration hot-reload** - Update config without restart
-- [ ] **Access logging** - Structured logging in various formats
-- [ ] **Request tracing** - Distributed tracing support
-- [ ] **Test organization** - Separate test files for enterprise features
+## Phase 7: Public Tunnel Service (Core Implementation)
 
-## Phase 6: Public Tunnel Service (Revolutionary Feature)
-
-### 6.1 Tunnel Client (Local HTTP Server)
+### 7.1 Tunnel Client (Local HTTP Server)
 - [ ] **Tunnel client integration** - Built-in tunnel client in local HTTP server
-- [ ] **Secure WebSocket connection** - Encrypted tunnel to public server
+- [ ] **Secure WebSocket connection** - Encrypted tunnel to public server (requires Phase 6 SSL)
 - [ ] **Authentication system** - API keys, user accounts, subdomain management
 - [ ] **Auto-reconnection** - Handle network interruptions gracefully
 - [ ] **Tunnel status monitoring** - Show tunnel health and public URL
 - [ ] **Multiple tunnel support** - Support multiple public URLs per local server
 - [ ] **Test organization** - Separate test files for tunnel client functionality
 
-### 6.2 Public Tunnel Server (httpserver.io)
+### 7.2 Public Tunnel Server (httpserver.io)
 - [ ] **Tunnel server architecture** - Separate server for handling public traffic
 - [ ] **Subdomain management** - Dynamic subdomain allocation (`abc123.httpserver.io`)
-- [ ] **Custom domain support** - Allow custom domains (`api.mycompany.com`)
-- [ ] **SSL certificate automation** - Auto-generate SSL certs for subdomains
+- [ ] **Wildcard SSL certificate** - Single `*.httpserver.io` certificate covers all tunnel subdomains
+- [ ] **Custom domain support** - Allow custom domains (`api.mycompany.com`) with separate SSL certificates
 - [ ] **User management** - Account creation, API key management
 - [ ] **Traffic routing** - Route public requests to correct tunnel connections
 - [ ] **Rate limiting** - Prevent abuse on public endpoints
 - [ ] **Test organization** - Separate test files for tunnel server functionality
 
-### 6.3 Tunnel Protocol Implementation
+### 7.3 Tunnel Protocol Implementation
 - [ ] **Bidirectional communication** - WebSocket-based tunnel protocol
 - [ ] **Request forwarding** - Forward HTTP requests through tunnel
 - [ ] **Response streaming** - Stream responses back through tunnel
@@ -559,16 +538,77 @@ rusty_webserver/
 - [ ] **Protocol versioning** - Support protocol upgrades
 - [ ] **Test organization** - Separate test files for tunnel protocol functionality
 
-### 6.4 Security & Authentication
-- [ ] **TLS everywhere** - Encrypt all tunnel traffic
-- [ ] **API key authentication** - Secure tunnel establishment
-- [ ] **Request validation** - Validate incoming public requests
-- [ ] **Access control** - IP whitelisting, geographic restrictions
-- [ ] **Audit logging** - Log all public traffic and tunnel activity
-- [ ] **DDoS protection** - Rate limiting and traffic filtering
+### 7.1 SSL/TLS Support
+- [ ] **SSL termination** - Handle HTTPS at the gateway, forward HTTP to backends
+- [ ] **Certificate management** - Load cert/key files from filesystem
+- [ ] **HTTP to HTTPS redirect** - Automatic redirect for SSL-enabled routes
+- [ ] **Backend SSL support** - Option to forward HTTPS to backends
+- [ ] **Let's Encrypt integration** - Automatic certificate generation/renewal
+- [ ] **SSL configuration** - Per-route SSL settings and certificate selection
+- [ ] **Test organization** - Separate test files for SSL functionality
+
+### 7.2 Advanced SSL Features
+- [ ] **SNI support** - Server Name Indication for multiple domains
+- [ ] **SSL passthrough** - Forward encrypted traffic without termination
+- [ ] **Certificate hot-reload** - Reload certificates without restart
+- [ ] **OCSP stapling** - Online Certificate Status Protocol
+- [ ] **TLS 1.3 support** - Latest TLS protocol support
+- [ ] **Certificate validation** - Enhanced certificate chain validation
+- [ ] **Cipher suite configuration** - Custom cipher suite selection
+- [ ] **Test organization** - Separate test files for advanced SSL functionality
+
+### 7.3 Security Hardening
+- [ ] **Security headers** - HSTS, CSP, X-Frame-Options enforcement
+- [ ] **IP filtering** - Whitelist/blacklist IP ranges
+- [ ] **Request size limits** - Prevent oversized request attacks
+- [ ] **Timeout hardening** - Configurable connection and request timeouts
+- [ ] **DDoS protection** - Basic rate limiting and connection throttling
+- [ ] **Security monitoring** - Log suspicious activities and attacks
 - [ ] **Test organization** - Separate test files for security functionality
 
-### 6.5 Management & Monitoring
+## Phase 8: Advanced SSL & Security
+
+### 8.1 Advanced SSL Features
+- [ ] **SNI support** - Server Name Indication for multiple domains (wildcards + custom domains)
+- [ ] **Wildcard certificate management** - Advanced wildcard cert handling and validation
+- [ ] **SSL passthrough** - Forward encrypted traffic without termination
+- [ ] **Certificate hot-reload** - Reload certificates without restart
+- [ ] **OCSP stapling** - Online Certificate Status Protocol for wildcard certs
+- [ ] **TLS 1.3 support** - Latest TLS protocol support
+- [ ] **Certificate validation** - Enhanced certificate chain validation for wildcard certs
+- [ ] **Cipher suite configuration** - Custom cipher suite selection
+- [ ] **Test organization** - Separate test files for advanced SSL functionality
+
+### 8.2 Security Hardening
+- [ ] **Security headers** - HSTS, CSP, X-Frame-Options enforcement
+- [ ] **IP filtering** - Whitelist/blacklist IP ranges
+- [ ] **Request size limits** - Prevent oversized request attacks
+- [ ] **Timeout hardening** - Configurable connection and request timeouts
+- [ ] **DDoS protection** - Basic rate limiting and connection throttling
+- [ ] **Security monitoring** - Log suspicious activities and attacks
+- [ ] **Test organization** - Separate test files for security functionality
+
+### 8.3 Tunnel Security Foundation
+- [ ] **TLS everywhere** - Encrypt all tunnel traffic (builds on Phase 6 SSL foundation and 8.1 advanced SSL)
+- [ ] **API key authentication** - Secure tunnel establishment
+- [ ] **Request validation** - Validate incoming public requests
+- [ ] **Access control** - IP whitelisting, geographic restrictions (builds on 8.2 IP filtering)
+- [ ] **Audit logging** - Log all public traffic and tunnel activity
+- [ ] **DDoS protection** - Rate limiting and traffic filtering (enhanced from 8.2 security hardening)
+- [ ] **Test organization** - Separate test files for tunnel security functionality
+
+### 8.4 Advanced Tunnel Security
+- [ ] **Certificate pinning** - Prevent man-in-the-middle attacks (builds on 8.1 advanced SSL)
+- [ ] **Token rotation** - Automatic API key rotation
+- [ ] **Session management** - Secure tunnel session handling
+- [ ] **Intrusion detection** - Automated threat detection (builds on 8.2 security monitoring)
+- [ ] **Compliance logging** - GDPR/SOX compliant audit trails
+- [ ] **Security monitoring** - Real-time security event monitoring (enhanced from 8.2)
+- [ ] **Test organization** - Separate test files for advanced tunnel security
+
+## Phase 9: Tunnel Management & Monitoring
+
+### 9.1 Management & Monitoring
 - [ ] **Web dashboard** - Manage tunnels, view traffic, analytics
 - [ ] **Real-time analytics** - Request counts, response times, error rates
 - [ ] **Tunnel logs** - View requests coming through public URLs
@@ -577,7 +617,20 @@ rusty_webserver/
 - [ ] **CLI management** - Command-line tools for tunnel management
 - [ ] **Test organization** - Separate test files for management functionality
 
-### 6.6 Deployment Infrastructure
+### 9.2 Advanced Analytics
+- [ ] **Traffic analysis** - Detailed traffic pattern analysis
+- [ ] **Performance metrics** - Response time distributions, throughput
+- [ ] **Error analysis** - Error rate tracking and categorization
+- [ ] **Geographic analytics** - Request origin mapping
+- [ ] **Custom dashboards** - User-configurable monitoring views
+- [ ] **Data export** - Analytics data export capabilities
+- [ ] **Test organization** - Separate test files for analytics functionality
+
+## Phase 10: Deployment & Infrastructure
+
+## Phase 10: Deployment & Infrastructure
+
+### 10.1 Deployment Infrastructure
 - [ ] **Docker containers** - Containerized tunnel server deployment
 - [ ] **Load balancer support** - Multiple tunnel server instances
 - [ ] **Database integration** - Store user accounts, tunnels, analytics
@@ -586,35 +639,91 @@ rusty_webserver/
 - [ ] **Auto-scaling** - Handle traffic spikes automatically
 - [ ] **Test organization** - Separate test files for deployment functionality
 
+### 10.2 Production Operations
+- [ ] **High availability** - Multi-region deployment
+- [ ] **Disaster recovery** - Backup and recovery procedures
+- [ ] **Performance optimization** - Connection pooling, caching
+- [ ] **Resource management** - Memory and CPU optimization
+- [ ] **Cost optimization** - Resource usage optimization
+- [ ] **SLA monitoring** - Service level agreement tracking
+- [ ] **Test organization** - Separate test files for operations
 
-### Phase 7: AI-Powered Log Analysis
+## Phase 11: Enterprise Features
+
+## Phase 11: Enterprise Features
+
+### 11.1 Metrics & Monitoring
+- [ ] **Metrics endpoint** - Prometheus-compatible metrics
+- [ ] **Custom metrics** - Application-specific metric collection
+- [ ] **Health metrics** - Detailed health check statistics
+- [ ] **Performance metrics** - Request timing, throughput, error rates
+- [ ] **Resource metrics** - Memory, CPU, connection usage
+- [ ] **Test organization** - Separate test files for metrics functionality
+
+### 11.2 Administration API
+- [ ] **Admin API** - REST API for configuration and monitoring
+- [ ] **Configuration management** - Runtime configuration updates
+- [ ] **Route management** - Add/remove routes without restart
+- [ ] **Target management** - Add/remove backend targets dynamically
+- [ ] **Health check control** - Enable/disable health checks per target
+- [ ] **Authentication** - Secure admin API with API keys
+- [ ] **Test organization** - Separate test files for admin API functionality
+
+### 11.3 Dynamic Configuration
+- [ ] **Configuration hot-reload** - Update config without restart
+- [ ] **File watching** - Automatic config reload on file changes
+- [ ] **API-based updates** - Update configuration via REST API
+- [ ] **Configuration validation** - Validate config before applying
+- [ ] **Rollback mechanism** - Revert to previous configuration on errors
+- [ ] **Configuration versioning** - Track configuration changes over time
+- [ ] **Test organization** - Separate test files for dynamic configuration
+
+### 11.4 Advanced Logging & Tracing
+- [ ] **Access logging** - Structured logging in various formats (JSON, Apache, etc.)
+- [ ] **Request tracing** - Distributed tracing support (OpenTelemetry)
+- [ ] **Correlation IDs** - Request correlation across services
+- [ ] **Log aggregation** - Integration with ELK stack, Splunk
+- [ ] **Custom log formats** - Configurable log output formats
+- [ ] **Log filtering** - Advanced filtering and sampling options
+- [ ] **Test organization** - Separate test files for advanced logging
+
+### 11.5 High Availability Features
+- [ ] **Graceful shutdown** - Clean connection termination
+- [ ] **Zero-downtime deployments** - Rolling updates without service interruption
+- [ ] **Connection draining** - Gradual connection migration during updates
+- [ ] **Backup configuration** - Automatic configuration backups
+- [ ] **Disaster recovery** - Configuration and state recovery procedures
+- [ ] **Multi-instance coordination** - Shared state across multiple gateway instances
+- [ ] **Test organization** - Separate test files for HA functionality
+
+## Phase 12: AI-Powered Log Analysis
 **Goal**: Implement intelligent log analysis and monitoring system
 
-#### 7.1 Core AI Integration
+#### 12.1 Core AI Integration
 - [ ] **MCP Server Integration** - Create Model Context Protocol server for log analysis
 - [ ] **Real-time Log Streaming** - WebSocket-based live log feeds
 - [ ] **AI Context Management** - Intelligent log summarization and context extraction
 - [ ] **Pattern Recognition** - Automated anomaly detection and trend analysis
 
-#### 7.2 Analysis Features
+#### 12.2 Analysis Features
 - [ ] **Request Performance Analysis** - Identify slow endpoints and bottlenecks
 - [ ] **Error Pattern Detection** - Categorize and track error trends
 - [ ] **Traffic Pattern Analysis** - Peak usage identification and capacity planning
 - [ ] **Security Monitoring** - Suspicious activity detection and alerts
 
-#### 7.3 Dashboard & Visualization
+#### 12.3 Dashboard & Visualization
 - [ ] **Real-time Dashboard** - Live metrics and log streaming interface
 - [ ] **Historical Analysis** - Time-series data visualization and trends
 - [ ] **Alert System** - Configurable notifications for critical events
 - [ ] **Report Generation** - Automated daily/weekly summary reports
 
-#### 7.4 Advanced Features
+#### 12.4 Advanced Features
 - [ ] **Predictive Analytics** - Traffic forecasting and capacity planning
 - [ ] **Custom Query Interface** - Natural language log queries via AI
 - [ ] **Integration APIs** - External monitoring tool connectivity
 - [ ] **Machine Learning Models** - Adaptive learning from historical data
 
-#### 7.5 Implementation Architecture
+#### 12.5 Implementation Architecture
 ```
 ┌─────────────────┐    ┌──────────────────┐    ┌─────────────────┐
 │   Log Files     │───▶│   MCP Server     │───▶│   AI Analysis   │
@@ -628,7 +737,7 @@ rusty_webserver/
 └─────────────────┘    └──────────────────┘    └─────────────────┘
 ```
 
-#### 7.6 Technical Specifications
+#### 12.6 Technical Specifications
 - [ ] **MCP Server**: TypeScript-based log processing server
 - [ ] **Database**: Time-series database (InfluxDB/TimescaleDB) for metrics
 - [ ] **Caching**: Redis for real-time data and session management
@@ -636,7 +745,7 @@ rusty_webserver/
 - [ ] **API**: RESTful endpoints + WebSocket for live data
 - [ ] **AI Integration**: Claude API for intelligent analysis and insights
 
-#### 7.7 Configuration Extensions
+#### 12.7 Configuration Extensions
 ```toml
 [ai_analysis]
 enabled = true
@@ -688,14 +797,30 @@ health_interval = 30
 ```toml
 [ssl]
 enabled = true
-cert_file = "./certs/server.crt"
-key_file = "./certs/server.key"
+cert_file = "./certs/wildcard.crt"  # Wildcard certificate for *.httpserver.io
+key_file = "./certs/wildcard.key"
 redirect_http = true
 
 [[proxy]]
 path = "/api/*"
 targets = ["http://localhost:3000"]  # Backend stays HTTP
 ssl_required = true  # Only serve over HTTPS
+```
+
+### Tunnel SSL Configuration
+```toml
+[ssl]
+enabled = true
+wildcard_cert_file = "./certs/wildcard_httpserver_io.crt"  # *.httpserver.io wildcard
+wildcard_key_file = "./certs/wildcard_httpserver_io.key"
+redirect_http = true
+
+[tunnel]
+enabled = true
+server = "tunnel.httpserver.io"
+api_key = "your-api-key-here"
+subdomain = "myproject"  # Results in https://myproject.httpserver.io (covered by wildcard)
+# All subdomains automatically get SSL via wildcard certificate
 ```
 
 ### WebSocket Configuration
@@ -714,8 +839,11 @@ health_check = "/ws/ping"
 enabled = true
 server = "tunnel.httpserver.io"
 api_key = "your-api-key-here"
-subdomain = "myproject"  # Results in https://myproject.httpserver.io
-custom_domain = "api.mycompany.com"  # Optional custom domain
+subdomain = "myproject"  # Results in https://myproject.httpserver.io (SSL via wildcard *.httpserver.io)
+custom_domain = "api.mycompany.com"  # Optional custom domain (requires separate SSL certificate)
+
+# All tunnel subdomains automatically get SSL via wildcard certificate
+# No per-subdomain certificate generation needed
 
 # Expose specific local services publicly
 [[tunnel.expose]]
