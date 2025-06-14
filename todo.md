@@ -3,29 +3,46 @@
 ## Project Overview
 Transform the current static HTTP server into a powerful application gateway that supports:
 - Static file serving (preserve existing functionality) ✅ **COMPLETED**
-- Reverse proxy with load balancing
-- Multiple backend service routing
-- Health checks and failover
+- Reverse proxy with load balancing ✅ **COMPLETED**
+- Multiple backend service routing ✅ **COMPLETED**
+- Health checks and failover ✅ **COMPLETED**
 - Modular architecture for maintainability ✅ **COMPLETED**
 
 ## 🎯 Current Status: **5.1 Request/Response Middleware - COMPLETE** ✅
 **Last Updated**: June 13, 2025  
 **Domain**: httpserver.io (acquired ✅)  
 **Architecture**: Fully modularized Rust workspace  
-**All existing functionality preserved**: ✅ Static file serving works perfectly  
-**Configuration System**: ✅ **ENHANCED** - Comprehensive `app_config.toml` with unified configuration  
-**Route Matching Engine**: ✅ Path-based routing with wildcards implemented  
-**HTTP Proxy**: ✅ Complete request forwarding with streaming response handling  
-**Load Balancing**: ✅ All 4 strategies implemented with comprehensive testing  
-**Target Management**: ✅ Complete target pool management with health tracking  
-**Configuration Schema**: ✅ Full multi-target configuration support  
-**WebSocket Support**: ✅ Complete WebSocket gateway with sticky sessions and health checks
-**Health Check System**: ✅ **COMPLETE** - All service crates have health endpoints, WebSocket & HTTP health monitoring implemented
-**Enhanced Logging System**: ✅ **COMPLETE** - Advanced logging with clean file output, request IDs, performance metrics
-**App Configuration**: ✅ **COMPLETE** - Unified `app_config.toml` consolidating all server functionality
-**Circuit Breaker Pattern**: ✅ **COMPLETE** - Full implementation with 30 tests passing
-**Request/Response Middleware**: ✅ **COMPLETE** - Full middleware system with headers, auth, rate limiting, transformations, compression
-**Test Organization**: ✅ All tests extracted into separate files by functionality (150+ tests passing)
+
+### **Completed Features:**
+✅ **Static File Serving** - Preserved existing functionality with SPA fallback  
+✅ **Route Matching Engine** - Path-based routing with wildcards implemented  
+✅ **HTTP Proxy** - Complete request forwarding with streaming response handling  
+✅ **Load Balancing** - All 4 strategies (round_robin, least_connections, weighted_round_robin, random)  
+✅ **Target Management** - Complete target pool management with health tracking  
+✅ **WebSocket Support** - Complete WebSocket gateway with sticky sessions and health checks  
+✅ **Health Check System** - All service crates have health endpoints, WebSocket & HTTP monitoring  
+✅ **Enhanced Logging System** - Advanced logging with clean file output, request IDs, performance metrics  
+✅ **Circuit Breaker Pattern** - Full implementation with 30 tests passing  
+✅ **Request/Response Middleware** - Headers, auth, rate limiting, transformations, compression  
+✅ **Test Organization** - All tests extracted into separate files by functionality (150+ tests passing)  
+
+### **Next Development Priority:**
+1. **Phase 6**: SSL Foundation (essential SSL termination and wildcard certificate management for tunnels)
+2. **Phase 7**: Public Tunnel Service (tunnel client integration, WebSocket tunneling, SSL-enabled public endpoints)
+3. **Phase 8**: Advanced SSL & Security (advanced SSL features, security hardening, comprehensive tunnel security)
+
+## Testing Strategy
+- [ ] **Test organization** - All tests must be in separate `tests/` files, grouped by functionality ✅ **COMPLETED for Phases 1-3**
+- [ ] **Unit tests** - Test individual components and strategies
+- [ ] **Integration tests** - Test proxy with real backend services
+- [ ] **WebSocket testing** - Test WebSocket proxying with real WebSocket servers
+- [ ] **SSL testing** - Test HTTPS termination and certificate handling
+- [ ] **Tunnel testing** - Test tunnel establishment and traffic forwarding
+- [ ] **End-to-end testing** - Test complete local-to-public tunnel flow
+- [ ] **Load testing** - Verify performance under load (local and tunnel)
+- [ ] **Security testing** - Penetration testing of tunnel infrastructure
+- [ ] **Failover testing** - Test health checks and circuit breakers
+- [ ] **Cross-platform testing** - Verify all platforms work correctly
 
 ## 📊 Test Organization Standards
 
@@ -37,7 +54,7 @@ All crates must follow standardized test organization:
 - **Clear naming** - test file names should indicate the functionality being tested
 - **Public API only** - tests should only use public APIs, no private struct/method access
 
-### **Current Test Structure (134+ total tests passing):**
+### **Current Test Structure (150+ total tests passing):**
 ```
 httpserver-balancer/tests/           (30 tests in 7 files)
 ├── load_balancing_strategies.rs     - 4 tests: All strategy algorithms
@@ -57,7 +74,8 @@ httpserver-proxy/tests/              (40 tests in 9 files)
 ├── websocket_e2e.rs                 - 1 test: End-to-end WebSocket testing
 ├── sticky_session_integration.rs    - 3 tests: Sticky session integration
 ├── health_check_integration.rs      - 6 tests: Health check and load balancer integration
-└── websocket_test_server.rs         - 0 tests: Helper WebSocket server for testing
+├── middleware_tests.rs              - 12 tests: Middleware functionality
+└── rate_limiting_tests.rs           - 7 tests: Rate limiting specific tests
 
 httpserver-config/tests/             (17 tests in 2 files)
 ├── config_parsing.rs                - 14 tests: Configuration parsing and validation
@@ -72,189 +90,6 @@ httpserver-static/tests/             (18 tests in 2 files)
 ├── static_handler_tests.rs          - 6 tests: Static handler creation and health endpoints
 └── file_serving_tests.rs            - 12 tests: File serving, security, caching
 ```  
-
-## 📋 Development Log & Session Context
-
-### ✅ **Phase 1.1 Complete (Current Session)**
-**What was done:**
-- Successfully split monolithic `main.rs` into 5 focused library crates
-- Created clean workspace structure with shared dependencies
-- Preserved 100% of existing functionality (static file serving with SPA fallback)
-- All build scripts (`b_mac.sh`, `b_linux.sh`, `b_win.bat`) work unchanged
-- All clean scripts (`c_mac.sh`, `c_linux.sh`, `c_win.bat`) work unchanged
-- Comprehensive testing verified debug and release builds compile and run correctly
-- Created detailed 6-phase roadmap with business model and technical architecture
-
-**Current file structure:**
-```
-rusty_webserver/
-├── Cargo.toml (workspace)
-├── todo.md (this file)
-├── httpserver/src/main.rs (main binary)
-├── httpserver-core/src/lib.rs (server startup, middleware, logging)
-├── httpserver-static/src/lib.rs (static file serving)
-├── httpserver-config/src/lib.rs (CLI parsing, config structs)
-├── httpserver-proxy/src/lib.rs (placeholder for Phase 2)
-├── httpserver-balancer/src/lib.rs (placeholder for Phase 3)
-└── build/clean scripts (all working)
-```
-
-### ✅ **Phase 1.2 Complete (Current Session)**
-**What was done:**
-- Implemented complete TOML configuration file parsing using `serde` and `toml` crates
-- Added robust configuration validation with detailed error messages
-- Created comprehensive config validation for static directories and proxy routes (future)
-- Added example configuration files: `config.simple.toml`, `config.example.toml`
-- Tested configuration loading end-to-end with validation
-- Preserved 100% backward compatibility - CLI arguments still work without config files
-- Enhanced error handling with descriptive messages for configuration issues
-
-**Configuration features implemented:**
-- TOML file parsing with proper error handling
-- Static file configuration validation (directory existence, fallback file)
-- Proxy route configuration validation (URL format, timeout values) - ready for Phase 2
-- CLI argument override capability (config file + CLI args work together)
-- Multiple example configuration files for different use cases
-
-**Testing completed:**
-- Verified config file loading works correctly
-- Validated error handling for invalid directories
-- Confirmed CLI arguments override config file settings
-- Tested TOML parsing error messages are clear and helpful
-
-### ✅ **Phase 2.1 Complete (Current Session)**
-**What was done:**
-- Implemented comprehensive route matching engine for reverse proxy functionality
-- Created `RouteMatcher` with support for exact paths and wildcard patterns (`/api/*`)
-- Added priority system where proxy routes take precedence over static files
-- Implemented path manipulation with automatic path stripping for wildcard routes
-- Added support for global wildcard (`*`) and prefix matching (`/api/*`)
-- Created `RouteMatch` structure to return matched route info and stripped paths
-- Integrated proxy route detection into main server startup
-- Added comprehensive unit tests (8 tests, all passing) covering:
-  - Exact path matching (`/health`)
-  - Wildcard path matching (`/api/*`)
-  - Route priority (first match wins)
-  - Path normalization (handles with/without leading slash)
-  - Global wildcard matching (`*`)
-  - Pattern compilation logic
-  - Empty routes handling
-  - Full ProxyHandler integration
-
-**Route matching features implemented:**
-- ✅ Path-based routing (`/api/*`, `/admin/*`, `/health`)
-- ✅ Priority system (proxy routes processed before static files)
-- ✅ Path manipulation (automatic stripping for forwarding)
-- ✅ Wildcard support (`/*` and `*` patterns)
-- ✅ Exact match support for specific endpoints
-- ✅ Path normalization (leading slash handling)
-- ✅ Order-based precedence (first matching route wins)
-
-**Testing completed:**
-- ✅ All 8 unit tests pass covering edge cases and functionality
-- ✅ Configuration loading works with proxy routes
-- ✅ Static file serving preserved when no proxy routes configured
-- ✅ Route detection and logging working correctly
-
-**Next development session should focus on:**
-1. **Phase 2.2**: Implement HTTP proxy forwarding functionality
-2. Add request forwarding to target servers using `reqwest`
-3. Implement response streaming back to clients
-4. Add proper header handling (Host, X-Forwarded-For, etc.)
-
-### ✅ **Phase 4.2 Comprehensive App Configuration & Enhanced Logging Complete (Current Session)**
-**What was done:**
-- **File Migration**: Successfully moved `test_logging.rs` from root to `httpserver-core/tests/logging_tests.rs`
-- **Configuration System Enhancement**: Created comprehensive `app_config.toml` consolidating all server functionality
-- **Extended LoggingConfig**: Enhanced from 6 to 14 fields with advanced logging options:
-  - `output_mode` ("both", "file", "console") for flexible output control
-  - `file_pattern` with placeholders (`{date}`, `{pid}`, `{hostname}`)
-  - `structured_logging`, `enable_request_ids`, `enable_performance_metrics`
-  - `rotation_strategy`, `compress_rotated_logs`, `max_rotated_files`
-- **Added ApplicationConfig & ServerConfig**: Unified application metadata and server configuration
-- **Consolidated Proxy Routes**: Integrated all proxy configurations from multiple TOML files into single `app_config.toml`
-- **Enhanced Logging Implementation**: Updated logging system with clean file output (no ANSI codes) and colored console output
-- **Build System Integration**: Enhanced build scripts to automatically copy `app_config.toml` to build directories
-- **Log Readability Fix**: Solved ANSI color code pollution in log files - now production-ready
-
-**Comprehensive app_config.toml features implemented:**
-- ✅ **14 enhanced logging fields** with advanced configuration options
-- ✅ **11 proxy routes** with different load balancing strategies (round_robin, least_connections, weighted_round_robin, random)
-- ✅ **WebSocket support** with sticky sessions and health checks
-- ✅ **Application settings** (name, environment configuration)
-- ✅ **Server configuration** (ports, timeouts, health endpoints)
-- ✅ **Static file configuration** with SPA fallback support
-- ✅ **Health check endpoints** for HTTP and WebSocket monitoring
-
-**Enhanced logging features implemented:**
-- ✅ **Clean file output** - No ANSI color codes in log files (production-ready)
-- ✅ **Colored console output** - Beautiful development experience with colors
-- ✅ **Request ID tracing** - Unique IDs for tracking request flows
-- ✅ **Performance metrics** - Request duration and status logging
-- ✅ **Structured logging** - Key-value pairs for better log analysis
-- ✅ **Multiple output modes** - File only, console only, or both
-- ✅ **Log rotation** - Size-based rotation with compression
-- ✅ **Configurable file patterns** - Dynamic naming with placeholders
-
-**Build system enhancements:**
-- ✅ **Automatic config deployment** - `b_win.bat` and `b_mac.sh` copy `app_config.toml` to build directories
-- ✅ **Error handling** - Proper handling of missing configuration files
-- ✅ **Cross-platform support** - Works on Windows, macOS, and Linux
-
-**Testing completed:**
-- ✅ **All 7 logging tests passing** with enhanced configuration structure
-- ✅ **All 14 config tests passing** with proper struct initialization  
-- ✅ **Application startup verified** - Loads `app_config.toml` correctly and shows all 11 proxy routes
-- ✅ **Build system tested** - Config files copied to `target/debug/` successfully
-- ✅ **Log readability verified** - Clean, parseable log files without ANSI codes
-- ✅ **Comprehensive configuration tested** - All proxy routes, WebSocket configs, and health checks working
-
-**Files created/modified:**
-- **Created**: `app_config.toml` - Comprehensive configuration consolidating all functionality
-- **Moved**: `test_logging.rs` → `httpserver-core/tests/logging_tests.rs`
-- **Enhanced**: LoggingConfig struct (6→14 fields), ApplicationConfig, ServerConfig
-- **Enhanced**: Logging initialization with clean file output and colored console
-- **Enhanced**: Build scripts with config file copying
-- **Fixed**: Log readability issue - removed ANSI codes from file output
-
-**Production readiness achieved:**
-- ✅ **Clean log files** - No color codes, perfect for log analysis tools
-- ✅ **Unified configuration** - Single `app_config.toml` for all server functionality
-- ✅ **Enhanced logging** - Request tracing, performance metrics, structured logging
-- ✅ **Automatic deployment** - Config files deployed with build system
-- ✅ **Backward compatibility** - CLI arguments still override config settings
-
-**Next development session should focus on:**
-1. **Phase 6**: SSL Foundation (essential SSL termination and certificate management for tunnels) - **TUNNEL PREREQUISITES**
-2. **Phase 7**: Public Tunnel Service (tunnel client integration, WebSocket tunneling, SSL-enabled public endpoints)
-3. **Phase 8**: Advanced SSL & Security (advanced SSL features, security hardening, comprehensive tunnel security)
-
-### ✅ **5.1 Request/Response Middleware - COMPLETE (Current Session)**
-**What was done:**
-- Implemented comprehensive request/response middleware system with 5 middleware types
-- Added `MiddlewareConfig` structure to configuration system with full TOML support
-- Created `MiddlewareProcessor` with complete middleware pipeline execution
-- Implemented header injection/removal for requests and responses with Host override capability
-- Added authentication middleware supporting Bearer tokens, Basic auth, custom headers, and API keys
-- Implemented per-client IP rate limiting with configurable time windows and concurrent connection tracking
-- Added request/response body transformations with text replacement and JSON field manipulation
-- Implemented Gzip compression for responses with configurable size thresholds and compression levels
-- Integrated middleware seamlessly with existing `ProxyHandler` and load balancing systems
-- Added comprehensive error handling with `MiddlewareError` enum for all middleware failure types
-- Created 19 comprehensive tests covering all middleware functionality including edge cases
-- Enhanced `app_config.toml` with practical middleware configuration examples
-- Fixed all ProxyRoute struct initializations across test files to include new middleware field
-
-**Middleware features implemented:**
-- ✅ **Header Management**: Add/remove request/response headers, Host override
-- ✅ **Authentication**: Bearer tokens, Basic auth, custom headers, API key injection
-- ✅ **Rate Limiting**: Per-client IP tracking with requests/minute and concurrent connection limits
-- ✅ **Body Transformations**: Text replacement and JSON field manipulation for requests/responses
-- ✅ **Compression**: Gzip response compression with configurable thresholds and levels
-- ✅ **Error Handling**: Comprehensive error types for rate limiting, headers, auth, transformations, compression
-- ✅ **Configuration**: Complete TOML structure with nested middleware configurations
-- ✅ **Integration**: Seamless integration with existing proxy handler, load balancing, and health checks
-- ✅ **Testing**: 19 middleware tests + 7 rate limiting specific tests (all passing)
 
 ## Phase 1: Architecture & Foundation
 
@@ -763,130 +598,6 @@ security_monitoring = true
 custom_patterns = ["error_rate", "response_time"]
 ```
 
-## Configuration Examples
-
-### Basic Configuration
-```toml
-# Static files (default behavior - no change needed)
-[static]
-directory = "./public"
-fallback = "index.html"
-
-# Simple proxy
-[[proxy]]
-path = "/api/*"
-target = "http://localhost:3000"
-timeout = 30
-```
-
-### Load Balanced Configuration
-```toml
-[[proxy]]
-path = "/api/*"
-strategy = "round_robin"
-targets = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "http://localhost:3002"
-]
-health_check = "/health"
-health_interval = 30
-```
-
-### HTTPS Configuration
-```toml
-[ssl]
-enabled = true
-cert_file = "./certs/wildcard.crt"  # Wildcard certificate for *.httpserver.io
-key_file = "./certs/wildcard.key"
-redirect_http = true
-
-[[proxy]]
-path = "/api/*"
-targets = ["http://localhost:3000"]  # Backend stays HTTP
-ssl_required = true  # Only serve over HTTPS
-```
-
-### Tunnel SSL Configuration
-```toml
-[ssl]
-enabled = true
-wildcard_cert_file = "./certs/wildcard_httpserver_io.crt"  # *.httpserver.io wildcard
-wildcard_key_file = "./certs/wildcard_httpserver_io.key"
-redirect_http = true
-
-[tunnel]
-enabled = true
-server = "tunnel.httpserver.io"
-api_key = "your-api-key-here"
-subdomain = "myproject"  # Results in https://myproject.httpserver.io (covered by wildcard)
-# All subdomains automatically get SSL via wildcard certificate
-```
-
-### WebSocket Configuration
-```toml
-[[proxy]]
-path = "/ws/*"
-targets = ["http://localhost:3001"]
-protocol = "websocket"
-sticky_sessions = true  # Keep connections to same backend
-health_check = "/ws/ping"
-```
-
-### Tunnel Configuration
-```toml
-[tunnel]
-enabled = true
-server = "tunnel.httpserver.io"
-api_key = "your-api-key-here"
-subdomain = "myproject"  # Results in https://myproject.httpserver.io (SSL via wildcard *.httpserver.io)
-custom_domain = "api.mycompany.com"  # Optional custom domain (requires separate SSL certificate)
-
-# All tunnel subdomains automatically get SSL via wildcard certificate
-# No per-subdomain certificate generation needed
-
-# Expose specific local services publicly
-[[tunnel.expose]]
-local_path = "/api/*"
-public_path = "/api/*"
-local_target = "http://localhost:3000"
-
-[[tunnel.expose]]
-local_path = "/admin/*"
-public_path = "/admin/*"
-local_target = "http://localhost:8000"
-```
-
-### Complete Integration Example
-```toml
-# Local static files
-[static]
-directory = "./public"
-
-# Local proxy routes
-[[proxy]]
-path = "/api/*"
-targets = ["http://localhost:3000", "http://localhost:3001"]
-strategy = "round_robin"
-
-# Public tunnel
-[tunnel]
-enabled = true
-subdomain = "myapp"
-expose_all = true  # Expose all local routes publicly
-```
-## Testing Strategy
-- [ ] **Test organization** - All tests must be in separate `tests/` files, grouped by functionality ✅ **COMPLETED for Phases 1-3**
-- [ ] **Unit tests** - Test individual components and strategies
-- [ ] **Integration tests** - Test proxy with real backend services
-- [ ] **WebSocket testing** - Test WebSocket proxying with real WebSocket servers
-- [ ] **SSL testing** - Test HTTPS termination and certificate handling
-- [ ] **Tunnel testing** - Test tunnel establishment and traffic forwarding
-- [ ] **End-to-end testing** - Test complete local-to-public tunnel flow
-- [ ] **Load testing** - Verify performance under load (local and tunnel)
-- [ ] **Security testing** - Penetration testing of tunnel infrastructure
-- [ ] **Failover testing** - Test health checks and circuit breakers
-- [ ] **Cross-platform testing** - Verify all platforms work correctly
 
 ## Business Model & Monetization
 - [ ] **Free tier** - Limited tunnels, subdomains, bandwidth
