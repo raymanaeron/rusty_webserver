@@ -39,18 +39,26 @@ Transform the current static HTTP server into a powerful application gateway tha
 
 **🚧 Phase 7.2 - Public Tunnel Server IN PROGRESS:**
 - ✅ **Tunnel server architecture** - Complete `TunnelServer` implementation (624 lines)
-- [ ] **Subdomain management** - Dynamic allocation with 3 strategies (Random, UserSpecified, UUID)
+- [ ] **HTTP Host header routing** - Parse Host header to route HTTP/HTTPS requests to correct tunnel
+- [ ] **Subdomain management** - Dynamic allocation with Random/UserSpecified strategies
+- [ ] **SSL passthrough** - Forward encrypted HTTPS traffic directly to tunnel client
 - [ ] **User management** - API key authentication system with token validation
-- [ ] **Traffic routing** - Complete HTTP request routing through tunnel connections
-- [ ] **Rate limiting** - Comprehensive rate limiting configuration and enforcement
+- [ ] **Rate limiting** - HTTP/HTTPS traffic rate limiting and bandwidth controls
 
-**🚧 Phase 7.3 - Tunnel Protocol NEEDS IMPLEMENTATION:**
+**🚧 Phase 7.3 - Tunnel Protocol (HTTP/HTTPS FOCUS):**
 - [ ] **HTTP request forwarding** - Forward HTTP requests through established tunnels
-- [ ] **Response streaming** - Stream responses back through tunnel connections  
-- [ ] **Connection multiplexing** - Multiple HTTP requests over single tunnel
-- [ ] **Bidirectional communication** - Full WebSocket-based tunnel protocol
-- [ ] **Load balancer integration** - Connect tunnel endpoints with existing load balancing
-- [ ] **Protocol versioning** - Support protocol upgrades and backwards compatibility
+- [ ] **HTTPS passthrough** - Forward encrypted HTTPS traffic to tunnel client
+- [ ] **Response streaming** - Stream HTTP responses back through tunnel connections  
+- [ ] **Connection multiplexing** - Multiple HTTP requests over single tunnel WebSocket
+- [ ] **Request/response correlation** - UUID-based async request tracking
+- [ ] **Integration with load balancer** - Connect tunnel endpoints with existing load balancing
+
+**📝 Future Protocol Support (Phase 7.4+):**
+- 🔮 **TCP/UDP tunneling** - Non-HTTP protocol support with port-based routing
+- 🔮 **WebSocket tunneling** - Native WebSocket protocol forwarding
+- 🔮 **Database tunneling** - MySQL, PostgreSQL, Redis tunneling support
+- 🔮 **Game server tunneling** - UDP-based game traffic forwarding
+- 🔮 **SNI-based routing** - TLS SNI for encrypted non-HTTP protocols
 
 **🧪 Testing Strategy for Tunnel Implementation:**
 - **Unit tests** - Test individual tunnel components (auth, connection, status)
@@ -554,38 +562,87 @@ httpserver-tunnel/tests/             (⚠️ MISSING - 0 tests)
 
 ## Phase 7.2: Public Tunnel Server
 
-### 🚧 **Phase 7.2 Public Tunnel Server - PARTIALLY COMPLETE**
+### 🚧 **Phase 7.2 Public Tunnel Server - HTTP/HTTPS IMPLEMENTATION**
 
 **✅ FOUNDATION COMPLETE:**
 - ✅ **Tunnel server architecture** - Complete `TunnelServer` implementation in `server.rs` (624 lines)
 
-**🚧 STILL NEEDS IMPLEMENTATION:**
-- [ ] **Subdomain management** - Dynamic subdomain allocation (`abc123.httpserver.io`)
+**🎯 IMPLEMENTATION PLAN (HTTP/HTTPS Only):**
+- [ ] **Subdomain management** - Dynamic allocation with Random/UserSpecified strategies (`abc123.httpserver.io`, `myapp.httpserver.io`)
+- [ ] **HTTP Host header routing** - Parse `Host` header to route requests to correct tunnel (single port 80/443)
+- [ ] **SSL passthrough** - Forward encrypted HTTPS traffic directly to tunnel client (more secure)
 - [ ] **Wildcard SSL certificate** - Single `*.httpserver.io` certificate covers all tunnel subdomains
 - [ ] **Custom domain support** - Allow custom domains (`api.mycompany.com`) with separate SSL certificates
-- [ ] **User management** - Account creation, API key management
-- [ ] **Traffic routing** - Route public requests to correct tunnel connections
-- [ ] **Rate limiting** - Prevent abuse on public endpoints
+- [ ] **User management** - Account creation, API key management for tunnel access
+- [ ] **Rate limiting** - Prevent abuse on public endpoints with bandwidth/connection limits
 - [ ] **Test organization** - Separate test files for tunnel server functionality
 
-**🏗️ Architecture Foundation Complete:**
-- ✅ **Dual server architecture** - Public HTTP server (port 80/443) + tunnel WebSocket server (port 8081)
-- ✅ **Configuration structure** - Complete config system ready for implementation
-- ✅ **Protocol foundation** - Basic tunnel protocol message handling in place
+**🏗️ Architecture Decisions:**
+- ✅ **HTTP/HTTPS Only** - Focus on web traffic routing via Host header parsing
+- ✅ **Single Port Strategy** - Port 80/443 with Host header routing (not dynamic port allocation)
+- ✅ **SSL Passthrough** - Forward encrypted traffic to tunnel client for security
+- ✅ **Dual Subdomain Strategy** - Both random generation and user-specified subdomains
 
-**📊 Current Status:** Architecture complete, core features need implementation
+**📝 Future Protocol Support Notes:**
+- 🔮 **Phase 7.4+ (Future)** - Non-HTTP protocol support (TCP/UDP tunneling)
+- 🔮 **Port-based routing** - Dynamic port allocation for raw TCP/UDP traffic  
+- 🔮 **SNI-based routing** - TLS Server Name Indication for encrypted non-HTTP protocols
+- 🔮 **Layer 4 tunneling** - Database connections, game servers, custom protocols
 
-## Phase 7.3: Tunnel Protocol Implementation
-- [ ] **Bidirectional communication** - WebSocket-based tunnel protocol
-- [ ] **Request forwarding** - Forward HTTP requests through tunnel
-- [ ] **Response streaming** - Stream responses back through tunnel
-- [ ] **Connection multiplexing** - Multiple HTTP requests over single tunnel
-- [ ] **Compression** - Compress tunnel traffic for performance
-- [ ] **Protocol versioning** - Support protocol upgrades
-- [ ] **Tunnel protocol message handling** - Complete tunnel protocol implementation
+**📊 Current Status:** HTTP/HTTPS tunnel routing implementation in progress
+
+## Phase 7.3: Tunnel Protocol Implementation (HTTP/HTTPS)
+- [ ] **HTTP request forwarding** - Forward HTTP requests through tunnel WebSocket connections
+- [ ] **HTTPS passthrough** - Forward encrypted HTTPS traffic directly to tunnel client
+- [ ] **Request/response correlation** - UUID-based request tracking for async responses
+- [ ] **Connection multiplexing** - Multiple HTTP requests over single tunnel WebSocket
+- [ ] **Response streaming** - Stream HTTP responses back through tunnel connections
+- [ ] **Error handling** - Comprehensive tunnel protocol error handling and recovery
+- [ ] **Protocol versioning** - Support protocol upgrades and backwards compatibility
 - [ ] **Integration with load balancer** - Connect tunnel endpoints with existing load balancing
-- [ ] **HTTP request forwarding through tunnels** - Forward incoming HTTP requests through established tunnel connections
 - [ ] **Test organization** - Separate test files for tunnel protocol functionality
+
+**📝 Future Protocol Extensions:**
+- 🔮 **Phase 7.4+** - TCP/UDP tunneling for non-HTTP protocols
+- 🔮 **WebSocket tunneling** - Native WebSocket support through tunnels  
+- 🔮 **Binary protocol support** - Raw TCP streams for databases, games, etc.
+- 🔮 **Compression** - Compress tunnel traffic for performance optimization
+
+## Phase 7.4: Non-HTTP Protocol Tunneling (Future)
+
+### 7.4.1 TCP/UDP Tunnel Support
+- [ ] **Port-based routing** - Dynamic port allocation for raw TCP/UDP connections
+- [ ] **TCP stream tunneling** - Forward raw TCP connections through WebSocket tunnels
+- [ ] **UDP packet tunneling** - Encapsulate UDP packets in WebSocket frames
+- [ ] **Protocol detection** - Auto-detect protocol type for routing decisions
+- [ ] **Firewall management** - Dynamic firewall rules for allocated ports
+- [ ] **Port pool management** - Efficient allocation and cleanup of tunnel ports
+
+### 7.4.2 Database & Service Tunneling
+- [ ] **Database tunnel support** - MySQL, PostgreSQL, Redis, MongoDB tunneling
+- [ ] **SSH tunnel integration** - SSH protocol forwarding through tunnels
+- [ ] **FTP/SFTP support** - File transfer protocol tunneling
+- [ ] **SMTP/IMAP tunneling** - Email protocol forwarding
+- [ ] **Custom protocol support** - Generic binary protocol tunneling
+- [ ] **Service discovery** - Automatic detection of tunneled services
+
+### 7.4.3 Gaming & Real-time Applications
+- [ ] **Game server tunneling** - UDP-based game traffic optimization
+- [ ] **Voice/Video tunneling** - RTP/RTCP protocol support
+- [ ] **WebRTC tunneling** - Peer-to-peer connection establishment
+- [ ] **Low-latency optimization** - Minimize tunnel overhead for real-time traffic
+- [ ] **QoS management** - Quality of Service for different protocol types
+- [ ] **Bandwidth prioritization** - Traffic shaping for gaming and real-time apps
+
+### 7.4.4 Advanced Routing Strategies
+- [ ] **SNI-based routing** - TLS Server Name Indication for encrypted protocols
+- [ ] **DPI (Deep Packet Inspection)** - Protocol identification for routing
+- [ ] **Layer 4 load balancing** - TCP/UDP traffic distribution
+- [ ] **Anycast tunneling** - Geographic routing for global applications
+- [ ] **Multi-protocol endpoints** - Single tunnel supporting multiple protocols
+- [ ] **Protocol bridging** - Convert between different protocol versions
+
+**🎯 Implementation Priority**: Focus on HTTP/HTTPS tunneling first (Phases 7.2-7.3), then expand to full protocol support in Phase 7.4+
 
 ## Phase 8: Advanced SSL & Security
 
