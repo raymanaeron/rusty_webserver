@@ -25,32 +25,39 @@ fn test_logging_config_defaults() {
     assert_eq!(config.level, "info");
     assert_eq!(config.file_logging, true);
     assert_eq!(config.logs_directory, PathBuf::from("./logs"));
-    assert_eq!(config.file_size_mb, 1);
+    assert_eq!(config.file_size_mb, 10);
     assert_eq!(config.retention_days, 30);
     assert_eq!(config.format, "text");
+    assert_eq!(config.output_mode, "both");
+    assert_eq!(config.file_pattern, "httpserver_{date}.log");
+    assert_eq!(config.structured_logging, true);
+    assert_eq!(config.enable_request_ids, true);
+    assert_eq!(config.enable_performance_metrics, true);
+    assert_eq!(config.rotation_strategy, "size");
+    assert_eq!(config.compress_rotated_logs, true);
+    assert_eq!(config.max_rotated_files, 5);
 }
 
 #[test]
 fn test_logging_initialization_structure() {
     // Test that we can create different logging configs without initializing
-    let configs = vec![
-        LoggingConfig {
-            level: "info".to_string(),
-            file_logging: true,
-            logs_directory: PathBuf::from("./test_logs_init"),
-            file_size_mb: 1,
-            retention_days: 7,
-            format: "text".to_string(),
-        },
-        LoggingConfig {
-            level: "debug".to_string(),
-            file_logging: true,
-            logs_directory: PathBuf::from("./test_logs_json"),
-            file_size_mb: 1,
-            retention_days: 7,
-            format: "json".to_string(),
-        },
-    ];
+    let mut config1 = LoggingConfig::default();
+    config1.level = "info".to_string();
+    config1.file_logging = true;
+    config1.logs_directory = PathBuf::from("./test_logs_init");
+    config1.file_size_mb = 1;
+    config1.retention_days = 7;
+    config1.format = "text".to_string();
+
+    let mut config2 = LoggingConfig::default();
+    config2.level = "debug".to_string();
+    config2.file_logging = true;
+    config2.logs_directory = PathBuf::from("./test_logs_json");
+    config2.file_size_mb = 1;
+    config2.retention_days = 7;
+    config2.format = "json".to_string();
+
+    let configs = vec![config1, config2];
 
     for config in configs {
         // Verify config structure is valid
@@ -107,17 +114,14 @@ async fn test_log_cleanup() {
     
     // Create test directory and some files
     std::fs::create_dir_all(test_dir).expect("Should create test directory");
-    std::fs::write(format!("{}/test.log", test_dir), "test content").expect("Should create test file");
-
-    // Create test config for cleanup
-    let logging_config = LoggingConfig {
-        level: "info".to_string(),
-        file_logging: true,
-        logs_directory: PathBuf::from(test_dir),
-        file_size_mb: 1,
-        retention_days: 7,
-        format: "text".to_string(),
-    };
+    std::fs::write(format!("{}/test.log", test_dir), "test content").expect("Should create test file");    // Create test config for cleanup
+    let mut logging_config = LoggingConfig::default();
+    logging_config.level = "info".to_string();
+    logging_config.file_logging = true;
+    logging_config.logs_directory = PathBuf::from(test_dir);
+    logging_config.file_size_mb = 1;
+    logging_config.retention_days = 7;
+    logging_config.format = "text".to_string();
 
     // Test log cleanup
     let result = cleanup_old_logs(&logging_config);
@@ -131,18 +135,15 @@ async fn test_log_cleanup() {
 fn test_different_log_levels() {
     // Test different log level configurations
     let levels = vec!["debug", "info", "warn", "error"];
-    let formats = vec!["text", "json"];
-
-    for level in levels {
+    let formats = vec!["text", "json"];    for level in levels {
         for format in &formats {
-            let config = LoggingConfig {
-                level: level.to_string(),
-                file_logging: true,
-                logs_directory: PathBuf::from("./test_logs"),
-                file_size_mb: 1,
-                retention_days: 7,
-                format: format.to_string(),
-            };
+            let mut config = LoggingConfig::default();
+            config.level = level.to_string();
+            config.file_logging = true;
+            config.logs_directory = PathBuf::from("./test_logs");
+            config.file_size_mb = 1;
+            config.retention_days = 7;
+            config.format = format.to_string();
             
             // Verify config creation succeeds
             assert_eq!(config.level, level);
@@ -165,14 +166,13 @@ async fn test_console_mode() {
 #[test]
 fn test_config_validation() {
     // Test that configs can be created with different values
-    let config = LoggingConfig {
-        level: "debug".to_string(),
-        file_logging: false,
-        logs_directory: PathBuf::from("./custom_logs"),
-        file_size_mb: 5,
-        retention_days: 14,
-        format: "json".to_string(),
-    };
+    let mut config = LoggingConfig::default();
+    config.level = "debug".to_string();
+    config.file_logging = false;
+    config.logs_directory = PathBuf::from("./custom_logs");
+    config.file_size_mb = 5;
+    config.retention_days = 14;
+    config.format = "json".to_string();
 
     assert_eq!(config.level, "debug");
     assert_eq!(config.file_logging, false);

@@ -1,5 +1,5 @@
 // Configuration parsing and validation tests
-use httpserver_config::{Config, Args, ProxyRoute, StaticConfig, HttpHealthConfig, WebSocketHealthConfig};
+use httpserver_config::{Config, Args, ProxyRoute, StaticConfig, HttpHealthConfig, WebSocketHealthConfig, LoggingConfig, ApplicationConfig, ServerConfig};
 use httpserver_balancer::{Target, LoadBalancingStrategy};
 use std::path::PathBuf;
 use tempfile::TempDir;
@@ -171,6 +171,9 @@ fn test_config_validation_invalid_directory() {
             fallback: "index.html".to_string(),
         },
         proxy: Vec::new(),
+        logging: LoggingConfig::default(),
+        application: ApplicationConfig::default(),
+        server: ServerConfig::default(),
     };
     
     let result = config.validate();
@@ -181,8 +184,7 @@ fn test_config_validation_invalid_directory() {
 #[test]
 fn test_config_validation_invalid_proxy_route() {
     let temp_dir = create_test_directory();
-    
-    let config = Config {
+      let config = Config {
         static_config: StaticConfig {
             directory: temp_dir.path().to_path_buf(),
             fallback: "index.html".to_string(),
@@ -199,6 +201,9 @@ fn test_config_validation_invalid_proxy_route() {
                 websocket_health: None,
             }
         ],
+        logging: LoggingConfig::default(),
+        application: ApplicationConfig::default(),
+        server: ServerConfig::default(),
     };
     
     let result = config.validate();
@@ -209,8 +214,7 @@ fn test_config_validation_invalid_proxy_route() {
 #[test]
 fn test_config_validation_no_targets() {
     let temp_dir = create_test_directory();
-    
-    let config = Config {
+      let config = Config {
         static_config: StaticConfig {
             directory: temp_dir.path().to_path_buf(),
             fallback: "index.html".to_string(),
@@ -227,6 +231,9 @@ fn test_config_validation_no_targets() {
                 websocket_health: None,
             }
         ],
+        logging: LoggingConfig::default(),
+        application: ApplicationConfig::default(),
+        server: ServerConfig::default(),
     };
     
     let result = config.validate();
@@ -237,8 +244,7 @@ fn test_config_validation_no_targets() {
 #[test]
 fn test_config_validation_invalid_url() {
     let temp_dir = create_test_directory();
-    
-    let config = Config {
+      let config = Config {
         static_config: StaticConfig {
             directory: temp_dir.path().to_path_buf(),
             fallback: "index.html".to_string(),
@@ -255,6 +261,9 @@ fn test_config_validation_invalid_url() {
                 websocket_health: None,
             }
         ],
+        logging: LoggingConfig::default(),
+        application: ApplicationConfig::default(),
+        server: ServerConfig::default(),
     };
     
     let result = config.validate();

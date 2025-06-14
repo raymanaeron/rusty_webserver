@@ -1,0 +1,195 @@
+# HTTP Server Application Configuration
+# This is the comprehensive configuration file that consolidates all functionality
+# including logging, static files, proxy routes, load balancing, WebSocket support,
+# health checks, and application settings.
+
+[logging]
+# Log level: "debug", "info", "warn", "error"
+level = "info"
+
+# Enable/disable file logging (true/false)
+file_logging = true
+
+# Directory where log files are stored
+logs_directory = "./logs"
+
+# Maximum log file size in MB before rotation
+file_size_mb = 10
+
+# Number of days to retain log files
+retention_days = 30
+
+# Log format: "text" or "json"
+format = "text"
+
+# Console output mode: "both", "file", "console"
+# - "both": Output to both console and file (default)
+# - "file": File output only 
+# - "console": Console output only
+output_mode = "both"
+
+# Log file pattern/naming convention
+# Available placeholders: {date}, {pid}, {hostname}
+file_pattern = "httpserver_{date}.log"
+
+# Enable structured logging with additional fields
+structured_logging = true
+
+# Request ID generation for traceability
+enable_request_ids = true
+
+# Performance metrics logging
+enable_performance_metrics = true
+
+# Log rotation strategy: "size", "daily", "hourly"
+rotation_strategy = "size"
+
+# Compression for rotated logs
+compress_rotated_logs = true
+
+# Maximum number of rotated log files to keep
+max_rotated_files = 5
+
+[application]
+# Application name for logging context
+name = "httpserver"
+
+# Environment: "development", "staging", "production"
+environment = "development"
+
+# Server configuration
+[server]
+# Default port if not specified via command line
+default_port = 8080
+
+# Request timeout in seconds
+request_timeout = 30
+
+# Maximum request body size in MB
+max_request_size_mb = 10
+
+# Enable health endpoints
+enable_health_endpoints = true
+
+# Static file serving configuration
+[static_config]
+directory = "."
+fallback = "index.html"
+enable_spa_fallback = true
+cache_control_max_age = 3600
+
+# Proxy Routes Configuration
+# Multiple routes can be defined for different use cases
+
+# API Routes with Load Balancing
+[[proxy]]
+path = "/api/*"
+strategy = "round_robin"
+timeout = 30
+targets = [
+    { url = "http://localhost:3000", weight = 1 },
+    { url = "http://localhost:3001", weight = 1 },
+    { url = "http://localhost:3002", weight = 1 }
+]
+
+# WebSocket Chat with Sticky Sessions and Health Checks
+[[proxy]]
+path = "/ws/chat/*"
+targets = [
+    { url = "http://localhost:5000", weight = 1 },
+    { url = "http://localhost:5001", weight = 1 },
+    { url = "http://localhost:5002", weight = 1 }
+]
+strategy = "least_connections"
+timeout = 300
+sticky_sessions = true
+
+[proxy.websocket_health]
+interval = 30
+timeout = 5
+path = "/health"
+ping_message = "ping"
+
+# WebSocket Notifications (Broadcast)
+[[proxy]]
+path = "/ws/notifications/*"
+targets = [
+    { url = "http://localhost:6000", weight = 1 },
+    { url = "http://localhost:6001", weight = 1 }
+]
+strategy = "round_robin"
+timeout = 600
+
+# WebSocket Realtime Data with Weighted Load Balancing
+[[proxy]]
+path = "/ws/realtime/*"
+targets = [
+    { url = "http://localhost:8000", weight = 3 },  # High-performance server
+    { url = "http://localhost:8001", weight = 2 },  # Medium-performance server
+    { url = "http://localhost:8002", weight = 1 }   # Backup server
+]
+strategy = "weighted_round_robin"
+timeout = 300
+
+# File Upload with Weighted Load Balancing
+[[proxy]]
+path = "/upload/*"
+strategy = "weighted_round_robin"
+timeout = 60
+targets = [
+    { url = "http://localhost:4000", weight = 3 },  # High-performance server
+    { url = "http://localhost:4001", weight = 2 },  # Medium-performance server
+    { url = "http://localhost:4002", weight = 1 }   # Basic server
+]
+
+[proxy.http_health]
+interval = 15
+timeout = 3
+path = "/health"
+expected_status_codes = [200, 204]
+
+# Cache Service with Random Load Balancing
+[[proxy]]
+path = "/cache/*"
+strategy = "random"
+timeout = 15
+targets = [
+    { url = "http://localhost:5000", weight = 1 },
+    { url = "http://localhost:5001", weight = 1 },
+    { url = "http://localhost:5002", weight = 1 },
+    { url = "http://localhost:5003", weight = 1 }
+]
+
+# Streaming Services with Least Connections
+[[proxy]]
+path = "/stream/*"
+strategy = "least_connections"
+timeout = 120
+targets = [
+    { url = "http://localhost:6000", weight = 1 },
+    { url = "http://localhost:6001", weight = 1 }
+]
+
+# Admin Routes (Single Target)
+[[proxy]]
+path = "/admin/*"
+target = "http://localhost:9000"
+timeout = 60
+
+# Health Check Endpoint
+[[proxy]]
+path = "/health"
+target = "http://localhost:9000"
+timeout = 10
+
+# Metrics Endpoint
+[[proxy]]
+path = "/metrics"
+target = "http://localhost:9001"
+timeout = 15
+
+# Legacy Single WebSocket Endpoint
+[[proxy]]
+path = "/ws/events"
+target = "http://localhost:7000"
+timeout = 300

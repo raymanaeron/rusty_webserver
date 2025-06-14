@@ -22,10 +22,21 @@ cargo build %BUILD_FLAG%
 if %errorlevel% equ 0 (
     echo Windows build successful
     echo Binary available at target\%BUILD_TYPE%\httpserver.exe
+    
+    REM Copy app_config.toml to build directory
+    echo Copying app_config.toml to build directory...
+    if exist app_config.toml (
+        copy app_config.toml target\%BUILD_TYPE%\app_config.toml >nul
+        echo Configuration file copied to target\%BUILD_TYPE%\app_config.toml
+    ) else (
+        echo Warning: app_config.toml not found, application will use defaults
+    )
+    
     echo.
     echo Usage:
     echo   .\target\%BUILD_TYPE%\httpserver.exe --help
     echo   .\target\%BUILD_TYPE%\httpserver.exe --directory .\public --port 8080
+    echo   .\target\%BUILD_TYPE%\httpserver.exe --config config.simple.toml
 ) else (
     echo Windows build failed
     exit /b 1

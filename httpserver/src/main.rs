@@ -20,10 +20,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let port = args.port;
     
-    // Create configuration from arguments
-    let config = Config::from_args(args)?;
+    // Load application configuration first
+    let mut config = Config::load_app_config()?;
     
-    // Initialize logging system
+    // Override with any CLI-specified config file
+    if let Some(config_path) = &args.config {
+        let cli_config = Config::load_from_file(config_path)?;
+        // Merge CLI config with app config (CLI takes precedence for proxy routes)
+        config.proxy = cli_config.proxy;
+        config.static_config = cli_config.static_config;
+    }
+    
+    // Override static directory with CLI argument
+    config.static_config.directory = args.directory;
+    
+    // Initialize logging system with app config
     initialize_logging(&config.logging)?;
     
     // Clean up old log files

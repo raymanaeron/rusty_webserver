@@ -15,7 +15,7 @@ use httpserver_config::LoggingConfig;
 /// Initialize the logging system based on configuration
 pub fn initialize_logging(config: &LoggingConfig) -> Result<(), Box<dyn std::error::Error>> {
     // Create logs directory if it doesn't exist
-    if config.file_logging {
+    if config.file_logging && (config.output_mode == "both" || config.output_mode == "file") {
         std::fs::create_dir_all(&config.logs_directory)?;
     }
 
@@ -23,40 +23,46 @@ pub fn initialize_logging(config: &LoggingConfig) -> Result<(), Box<dyn std::err
     let filter = EnvFilter::try_from_default_env()
         .unwrap_or_else(|_| EnvFilter::new(&config.level));
 
-    // Build the subscriber with console output
+    // Build the subscriber
     let subscriber = tracing_subscriber::registry()
         .with(filter);
 
-    if config.file_logging {
-        // Create file appender with rotation based on size
+    // Determine what outputs to enable based on output_mode
+    let enable_file = config.file_logging && (config.output_mode == "both" || config.output_mode == "file");
+    let enable_console = config.output_mode == "both" || config.output_mode == "console";
+
+    if enable_file && enable_console {
+        // Both file and console output
         let file_appender = RollingFileAppender::builder()
             .rotation(Rotation::NEVER) // We'll handle rotation manually by size
             .filename_prefix("httpserver")
             .filename_suffix("log")
             .build(&config.logs_directory)?;
 
-        let (non_blocking_appender, _guard) = non_blocking(file_appender);
-
-        // Add file logging layer
+        let (non_blocking_appender, _guard) = non_blocking(file_appender);        // Add file logging layer (NO ANSI colors for file output)
         let file_layer = if config.format == "json" {
             fmt::layer()
                 .json()
+                .with_ansi(false)  // Disable ANSI colors for file output
                 .with_writer(non_blocking_appender)
                 .boxed()
         } else {
             fmt::layer()
+                .with_ansi(false)  // Disable ANSI colors for file output
                 .with_writer(non_blocking_appender)
                 .boxed()
         };
 
-        // Add console logging layer
+        // Add console logging layer (WITH ANSI colors for console output)
         let console_layer = if config.format == "json" {
             fmt::layer()
                 .json()
+                .with_ansi(true)   // Enable ANSI colors for console output
                 .with_writer(std::io::stdout)
                 .boxed()
         } else {
             fmt::layer()
+                .with_ansi(true)   // Enable ANSI colors for console output
                 .with_writer(std::io::stdout)
                 .boxed()
         };
@@ -70,17 +76,55 @@ pub fn initialize_logging(config: &LoggingConfig) -> Result<(), Box<dyn std::err
             logs_directory = %config.logs_directory.display(),
             level = %config.level,
             format = %config.format,
-            "Logging initialized with file output"
+            output_mode = %config.output_mode,
+            structured_logging = config.structured_logging,
+            enable_request_ids = config.enable_request_ids,
+            enable_performance_metrics = config.enable_performance_metrics,
+            rotation_strategy = %config.rotation_strategy,
+            "Logging initialized with both file and console output"
         );
-    } else {
-        // Console-only logging
+    } else if enable_file {
+        // File-only output
+        let file_appender = RollingFileAppender::builder()
+            .rotation(Rotation::NEVER) // We'll handle rotation manually by size
+            .filename_prefix("httpserver")
+            .filename_suffix("log")
+            .build(&config.logs_directory)?;
+
+        let (non_blocking_appender, _guard) = non_blocking(file_appender);        let file_layer = if config.format == "json" {
+            fmt::layer()
+                .json()
+                .with_ansi(false)  // Disable ANSI colors for file output
+                .with_writer(non_blocking_appender)
+                .boxed()
+        } else {
+            fmt::layer()
+                .with_ansi(false)  // Disable ANSI colors for file output
+                .with_writer(non_blocking_appender)
+                .boxed()
+        };
+
+        subscriber
+            .with(file_layer)
+            .init();
+
+        tracing::info!(
+            logs_directory = %config.logs_directory.display(),
+            level = %config.level,
+            format = %config.format,
+            output_mode = %config.output_mode,
+            "Logging initialized with file output only"
+        );
+    } else {        // Console-only logging (WITH ANSI colors)
         let console_layer = if config.format == "json" {
             fmt::layer()
                 .json()
+                .with_ansi(true)   // Enable ANSI colors for console output
                 .with_writer(std::io::stdout)
                 .boxed()
         } else {
             fmt::layer()
+                .with_ansi(true)   // Enable ANSI colors for console output
                 .with_writer(std::io::stdout)
                 .boxed()
         };
@@ -92,11 +136,10 @@ pub fn initialize_logging(config: &LoggingConfig) -> Result<(), Box<dyn std::err
         tracing::info!(
             level = %config.level,
             format = %config.format,
+            output_mode = %config.output_mode,
             "Logging initialized (console only)"
         );
-    }
-
-    Ok(())
+    }    Ok(())
 }
 
 /// Create a request span with unique ID for tracing

@@ -7,6 +7,7 @@ use axum::{
     Json,
 };
 use serde_json::{json, Value};
+use tracing;
 
 // Re-export types from balancer crate
 pub use httpserver_balancer::{LoadBalancingStrategy, Target};
@@ -42,6 +43,14 @@ pub struct Config {
     /// Logging configuration
     #[serde(default)]
     pub logging: LoggingConfig,
+    
+    /// Application configuration
+    #[serde(default)]
+    pub application: ApplicationConfig,
+    
+    /// Server configuration
+    #[serde(default)]
+    pub server: ServerConfig,
 }
 
 /// Static file serving configuration
@@ -165,7 +174,7 @@ pub struct LoggingConfig {
     #[serde(default = "default_logs_directory")]
     pub logs_directory: PathBuf,
     
-    /// Log file size limit in MB (default: 1)
+    /// Log file size limit in MB (default: 10)
     #[serde(default = "default_file_size_mb")]
     pub file_size_mb: u64,
     
@@ -176,6 +185,38 @@ pub struct LoggingConfig {
     /// Log format ("json" or "text", default: "text")
     #[serde(default = "default_log_format")]
     pub format: String,
+    
+    /// Output mode ("both", "file", "console", default: "both")
+    #[serde(default = "default_output_mode")]
+    pub output_mode: String,
+    
+    /// Log file pattern with placeholders
+    #[serde(default = "default_file_pattern")]
+    pub file_pattern: String,
+    
+    /// Enable structured logging with additional fields
+    #[serde(default = "default_structured_logging")]
+    pub structured_logging: bool,
+    
+    /// Enable request ID generation for traceability
+    #[serde(default = "default_enable_request_ids")]
+    pub enable_request_ids: bool,
+    
+    /// Enable performance metrics logging
+    #[serde(default = "default_enable_performance_metrics")]
+    pub enable_performance_metrics: bool,
+    
+    /// Log rotation strategy ("size", "daily", "hourly")
+    #[serde(default = "default_rotation_strategy")]
+    pub rotation_strategy: String,
+    
+    /// Compression for rotated logs
+    #[serde(default = "default_compress_rotated_logs")]
+    pub compress_rotated_logs: bool,
+    
+    /// Maximum number of rotated log files to keep
+    #[serde(default = "default_max_rotated_files")]
+    pub max_rotated_files: u32,
 }
 
 impl Default for LoggingConfig {
@@ -187,6 +228,14 @@ impl Default for LoggingConfig {
             file_size_mb: default_file_size_mb(),
             retention_days: default_retention_days(),
             format: default_log_format(),
+            output_mode: default_output_mode(),
+            file_pattern: default_file_pattern(),
+            structured_logging: default_structured_logging(),
+            enable_request_ids: default_enable_request_ids(),
+            enable_performance_metrics: default_enable_performance_metrics(),
+            rotation_strategy: default_rotation_strategy(),
+            compress_rotated_logs: default_compress_rotated_logs(),
+            max_rotated_files: default_max_rotated_files(),
         }
     }
 }
@@ -204,7 +253,7 @@ fn default_logs_directory() -> PathBuf {
 }
 
 fn default_file_size_mb() -> u64 {
-    1 // 1 MB
+    10 // 10 MB
 }
 
 fn default_retention_days() -> u32 {
@@ -213,6 +262,38 @@ fn default_retention_days() -> u32 {
 
 fn default_log_format() -> String {
     "text".to_string()
+}
+
+fn default_output_mode() -> String {
+    "both".to_string()
+}
+
+fn default_file_pattern() -> String {
+    "httpserver_{date}.log".to_string()
+}
+
+fn default_structured_logging() -> bool {
+    true
+}
+
+fn default_enable_request_ids() -> bool {
+    true
+}
+
+fn default_enable_performance_metrics() -> bool {
+    true
+}
+
+fn default_rotation_strategy() -> String {
+    "size".to_string()
+}
+
+fn default_compress_rotated_logs() -> bool {
+    true
+}
+
+fn default_max_rotated_files() -> u32 {
+    5
 }
 
 impl Default for Config {
@@ -224,6 +305,8 @@ impl Default for Config {
             },
             proxy: Vec::new(),
             logging: LoggingConfig::default(),
+            application: ApplicationConfig::default(),
+            server: ServerConfig::default(),
         }
     }
 }
@@ -266,6 +349,25 @@ impl Config {
         config.static_config.directory = args.directory;
         
         Ok(config)
+    }
+    
+    /// Load application configuration from app_config.toml file
+    pub fn load_app_config() -> Result<Self, Box<dyn std::error::Error>> {
+        let app_config_path = PathBuf::from("app_config.toml");
+        
+        if app_config_path.exists() {
+            tracing::info!(
+                config_file = %app_config_path.display(),
+                "Loading application configuration from app_config.toml"
+            );
+            Self::load_from_file(&app_config_path)
+        } else {
+            tracing::warn!(
+                config_file = %app_config_path.display(),
+                "app_config.toml not found, using default configuration"
+            );
+            Ok(Self::default())
+        }
     }
     
     /// Validate the configuration
@@ -366,6 +468,82 @@ impl ProxyRoute {
         }
         
         Ok(())
+    }
+}
+
+/// Application configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ApplicationConfig {
+    /// Application name for logging context
+    #[serde(default = "default_app_name")]
+    pub name: String,
+    
+    /// Environment: "development", "staging", "production"
+    #[serde(default = "default_environment")]
+    pub environment: String,
+}
+
+/// Server configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerConfig {
+    /// Default port if not specified via command line
+    #[serde(default = "default_server_port")]
+    pub default_port: u16,
+    
+    /// Request timeout in seconds
+    #[serde(default = "default_request_timeout")]
+    pub request_timeout: u64,
+    
+    /// Maximum request body size in MB
+    #[serde(default = "default_max_request_size_mb")]
+    pub max_request_size_mb: u64,
+    
+    /// Enable health endpoints
+    #[serde(default = "default_enable_health_endpoints")]
+    pub enable_health_endpoints: bool,
+}
+
+fn default_app_name() -> String {
+    "httpserver".to_string()
+}
+
+fn default_environment() -> String {
+    "development".to_string()
+}
+
+fn default_server_port() -> u16 {
+    8080
+}
+
+fn default_request_timeout() -> u64 {
+    30
+}
+
+fn default_max_request_size_mb() -> u64 {
+    10
+}
+
+fn default_enable_health_endpoints() -> bool {
+    true
+}
+
+impl Default for ApplicationConfig {
+    fn default() -> Self {
+        Self {
+            name: default_app_name(),
+            environment: default_environment(),
+        }
+    }
+}
+
+impl Default for ServerConfig {
+    fn default() -> Self {
+        Self {
+            default_port: default_server_port(),
+            request_timeout: default_request_timeout(),
+            max_request_size_mb: default_max_request_size_mb(),
+            enable_health_endpoints: default_enable_health_endpoints(),
+        }
     }
 }
 
