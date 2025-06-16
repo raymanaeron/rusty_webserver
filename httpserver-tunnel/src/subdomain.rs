@@ -252,6 +252,61 @@ impl SubdomainManager {
         storage.active_subdomains.get(subdomain).map(|record| record.tunnel_id.clone())
     }
 
+    /// Get tunnel ID for a custom domain
+    pub async fn get_tunnel_for_custom_domain(&self, domain: &str) -> Option<String> {
+        // For now, we'll store custom domains in the same storage with a special prefix
+        // In a production system, this might be a separate storage system
+        let custom_key = format!("custom:{}", domain);
+        let storage = self.storage.read().await;
+        storage.active_subdomains.get(&custom_key).map(|record| record.tunnel_id.clone())
+    }
+
+    /// Allocate custom domain (for future use)
+    pub async fn allocate_custom_domain(
+        &self,
+        tunnel_id: &str,
+        domain: &str,
+        client_ip: Option<String>,
+    ) -> Result<String, TunnelError> {
+        // Basic domain validation
+        if domain.is_empty() || domain.len() > 253 {
+            return Err(TunnelError::ValidationError("Invalid domain format".to_string()));
+        }
+
+        let custom_key = format!("custom:{}", domain);
+        
+        // Check if domain is available
+        {
+            let storage = self.storage.read().await;
+            if storage.active_subdomains.contains_key(&custom_key) {
+                return Err(TunnelError::ConflictError(format!(
+                    "Custom domain '{}' is already in use",
+                    domain
+                )));
+            }
+        }
+
+        // Allocate the custom domain
+        let record = SubdomainRecord {
+            subdomain: custom_key.clone(),
+            tunnel_id: tunnel_id.to_string(),
+            allocated_at: chrono::Utc::now(),
+            is_custom: true,
+            client_ip,
+        };
+
+        {
+            let mut storage = self.storage.write().await;
+            storage.active_subdomains.insert(custom_key, record.clone());
+            storage.allocation_history.push(record);
+        }
+
+        self.save_storage().await?;
+        
+        info!("Allocated custom domain '{}' to tunnel {}", domain, tunnel_id);
+        Ok(domain.to_string())
+    }
+
     /// Get all active subdomains
     pub async fn get_active_subdomains(&self) -> HashMap<String, SubdomainRecord> {
         let storage = self.storage.read().await;

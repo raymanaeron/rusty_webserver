@@ -22,7 +22,7 @@ async fn test_subdomain_manager_integration() {
         subdomain_strategy: SubdomainStrategy::Random,
         ..Default::default()
     };    // Test server creation with subdomain manager
-    let server = TunnelServer::new(config.clone()).expect("Failed to create server");
+    let _server = TunnelServer::new(config.clone()).expect("Failed to create server");
     
     // Verify server initialization works
     // (Configuration is verified through successful creation)
@@ -43,13 +43,12 @@ async fn test_subdomain_manager_integration() {
 async fn test_pronounceable_subdomain_patterns() {
     // This would normally test the actual word generation
     // For now, we verify the configuration supports pronounceable words
-    
-    let config = TunnelServerConfig {
+      let config = TunnelServerConfig {
         enabled: true,
         subdomain_strategy: SubdomainStrategy::Random,
         ..Default::default()
     };
-      let server = TunnelServer::new(config).expect("Failed to create server");
+      let _server = TunnelServer::new(config).expect("Failed to create server");
     
     // Verify the server creates successfully with random strategy
     // (Configuration validation happens during creation)
@@ -118,11 +117,10 @@ async fn test_subdomain_collision_handling() {
     let config = TunnelServerConfig {
         enabled: true,
         base_domain: "test.localhost".to_string(),
-        subdomain_strategy: SubdomainStrategy::Random,
-        max_tunnels: 5,
+        subdomain_strategy: SubdomainStrategy::Random,        max_tunnels: 5,
         ..Default::default()
     };
-      let server = TunnelServer::new(config).expect("Failed to create server");
+      let _server = TunnelServer::new(config).expect("Failed to create server");
     
     // Test that server supports multiple tunnels (collision avoidance)
     // (Configuration is validated during server creation)
@@ -140,7 +138,7 @@ async fn test_client_subdomain_logging_support() {
         base_domain: "tunnel.example.com".to_string(),
         ..Default::default()
     };
-      let server = TunnelServer::new(config).expect("Failed to create server");
+      let _server = TunnelServer::new(config).expect("Failed to create server");
     
     // Verify server is configured to provide subdomain information to clients
     // (Configuration validation happens during creation)
@@ -158,12 +156,11 @@ async fn test_phase_7_2_features_integration() {
         tunnel_port: 8091,
         public_port: 80,
         public_https_port: 443,
-        base_domain: "httpserver.io".to_string(),
-        max_tunnels: 100,
+        base_domain: "httpserver.io".to_string(),        max_tunnels: 100,
         subdomain_strategy: SubdomainStrategy::Random,
         ..Default::default()
     };
-      let server = TunnelServer::new(config).expect("Failed to create production server");
+      let _server = TunnelServer::new(config).expect("Failed to create production server");
     
     // Verify server creation with production-ready configuration
     // (All configuration validation happens during server creation)

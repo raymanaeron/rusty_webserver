@@ -117,6 +117,26 @@ pub struct TunnelServerAuthConfig {
     /// Token expiration time in seconds
     #[serde(default = "default_token_expiry")]
     pub token_expiry: u64,
+    
+    /// Enable JWT token-based authentication
+    #[serde(default = "default_false")]
+    pub jwt_enabled: bool,
+    
+    /// Enable user registration
+    #[serde(default = "default_false")]
+    pub user_registration_enabled: bool,
+    
+    /// Enable API key rotation
+    #[serde(default = "default_false")]
+    pub api_key_rotation_enabled: bool,
+    
+    /// API key rotation interval in hours
+    #[serde(default = "default_key_rotation_hours")]
+    pub api_key_rotation_hours: u64,
+    
+    /// Admin API keys for user management
+    #[serde(default)]
+    pub admin_keys: Vec<String>,
 }
 
 /// Tunnel rate limiting configuration
@@ -439,6 +459,7 @@ fn default_requests_per_minute() -> u32 { 1000 }
 fn default_max_concurrent() -> u32 { 100 }
 fn default_max_bandwidth() -> u64 { 10_485_760 } // 10 MB/s
 fn default_token_expiry() -> u64 { 86400 } // 24 hours
+fn default_key_rotation_hours() -> u64 { 168 } // 7 days
 
 // Network configuration defaults
 fn default_bind_address() -> String { "0.0.0.0".to_string() }

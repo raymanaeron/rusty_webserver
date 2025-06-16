@@ -6,8 +6,6 @@ use httpserver_tunnel::protocol::{TunnelMessage, TunnelProtocol};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use futures_util::{SinkExt, StreamExt};
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::Mutex;
 use tracing::{info, debug};
 
 #[tokio::test]
@@ -62,26 +60,38 @@ fn create_test_tunnel_config() -> TunnelServerConfig {
         public_https_port: 8443,
         base_domain: "tunnel.test".to_string(),
         max_tunnels: 10,
-        subdomain_strategy: httpserver_tunnel::config::SubdomainStrategy::Random,
-        auth: httpserver_tunnel::config::TunnelServerAuthConfig {
+        subdomain_strategy: httpserver_tunnel::config::SubdomainStrategy::Random,        auth: httpserver_tunnel::config::TunnelServerAuthConfig {
             required: false,
             api_keys: vec!["test-token".to_string()],
-            tokens: vec![],
+            jwt_secret: None,
+            token_expiry: 3600,
+            jwt_enabled: false,
+            user_registration_enabled: false,
+            api_key_rotation_enabled: false,
+            api_key_rotation_hours: 168,
+            admin_keys: vec![],
         },
         rate_limiting: httpserver_tunnel::config::TunnelRateLimitConfig {
             enabled: false,
             requests_per_minute: 100,
-            bandwidth_mbps: 10.0,
-        },
-        ssl: httpserver_tunnel::config::TunnelServerSslConfig {
+            max_concurrent_connections: 10,
+            max_bandwidth_bps: 10485760, // 10 MB/s
+        },        ssl: httpserver_tunnel::config::TunnelServerSslConfig {
             enabled: false,
-            cert_file: None,
-            key_file: None,
+            wildcard_cert_file: None,
+            wildcard_key_file: None,
+            redirect_http: false,
         },
         network: httpserver_tunnel::config::TunnelServerNetworkConfig {
             bind_address: "127.0.0.1".to_string(),
             public_bind_address: "127.0.0.1".to_string(),
-            max_connections_per_ip: 10,
+            ipv6_enabled: false,
+            tcp_keepalive: true,
+            tcp_keepalive_idle: 7200,
+            tcp_keepalive_interval: 75,
+            tcp_keepalive_probes: 9,
+            socket_reuse_address: true,
+            socket_reuse_port: false,
         },
     }
 }
@@ -196,7 +206,7 @@ struct TestHttpResponse {
 }
 
 async fn forward_to_local_server(
-    method: &str,
+    _method: &str,
     path: &str,
     _headers: &HashMap<String, String>,
     _body: Option<Vec<u8>>,

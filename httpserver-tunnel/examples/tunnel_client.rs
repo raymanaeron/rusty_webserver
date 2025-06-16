@@ -8,7 +8,6 @@ use tokio::net::TcpStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use std::collections::HashMap;
 use tracing::{info, error, debug};
-use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {    // Initialize tracing
@@ -55,23 +54,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {    // Initialize tra
                 }
             }
         }
-    }
+    }    info!("Tunnel client ready, waiting for HTTP requests...");
 
-    info!("Tunnel client ready, waiting for HTTP requests...");    // Start heartbeat task
-    let mut ws_sender_heartbeat = ws_sender.clone();
+    // Wrap the sender in Arc<Mutex> for sharing between tasks
+    let ws_sender_shared = std::sync::Arc::new(tokio::sync::Mutex::new(ws_sender));
+    
+    // Start heartbeat task
+    let ws_sender_heartbeat = ws_sender_shared.clone();
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(30));
         loop {
             interval.tick().await;
             let ping = TunnelProtocol::create_ping_message();
-            if let Ok(data) = TunnelProtocol::serialize_message(&ping) {
-                if let Err(e) = ws_sender_heartbeat.send(Message::Binary(data)).await {
-                    error!("Failed to send heartbeat: {}", e);
+            if let Ok(ping_data) = TunnelProtocol::serialize_message(&ping) {
+                let mut sender = ws_sender_heartbeat.lock().await;
+                if sender.send(Message::Binary(ping_data)).await.is_err() {
                     break;
                 }
             }
-        }
-    });
+        }    });
 
     // Handle incoming tunnel messages
     while let Some(msg) = ws_receiver.next().await {
@@ -92,11 +93,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {    // Initialize tra
                             id,
                             status: response.status,
                             headers: response.headers,
-                            body: response.body,
-                        };
+                            body: response.body,                        };
 
                         if let Ok(response_data) = TunnelProtocol::serialize_message(&response_msg) {
-                            if let Err(e) = ws_sender.send(Message::Binary(response_data)).await {
+                            let mut sender = ws_sender_shared.lock().await;
+                            if let Err(e) = sender.send(Message::Binary(response_data)).await {
                                 error!("Failed to send response: {}", e);
                             }
                         }
@@ -105,7 +106,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {    // Initialize tra
                         // Respond to ping
                         let pong = TunnelMessage::Pong { timestamp };
                         if let Ok(data) = TunnelProtocol::serialize_message(&pong) {
-                            let _ = ws_sender.send(Message::Binary(data)).await;
+                            let mut sender = ws_sender_shared.lock().await;
+                            let _ = sender.send(Message::Binary(data)).await;
                         }
                     }
                     TunnelMessage::SslConnect { id, initial_data } => {

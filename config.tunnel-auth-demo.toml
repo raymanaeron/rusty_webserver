@@ -1,0 +1,53 @@
+# Tunnel Server Configuration with Enhanced Authentication
+# Phase 7.3 - API Key and JWT Authentication Demo
+
+[tunnel.server]
+enabled = true
+tunnel_port = 8091
+public_port = 8092  
+public_https_port = 8093
+base_domain = "httpserver.io"
+max_tunnels = 100
+subdomain_strategy = "Random"
+
+[tunnel.server.auth]
+required = true
+# API keys for tunnel authentication
+api_keys = [
+    "sk-user123-abcdef123456",     # User: user-user123 -> subdomain: user123.httpserver.io
+    "sk-alice-7890wxyz",           # User: user-alice -> subdomain: alice.httpserver.io
+    "sk-bob-4567mnop",             # User: user-bob -> subdomain: bob.httpserver.io
+    "demo-api-key-qwerty"          # User: user-demo-api -> subdomain: demo-api.httpserver.io
+]
+
+# JWT token support (optional)
+jwt_enabled = true
+jwt_secret = "your-super-secret-jwt-signing-key-change-this-in-production"
+token_expiry = 86400  # 24 hours
+
+# Simple configuration - no complex user management
+user_registration_enabled = false
+api_key_rotation_enabled = false
+api_key_rotation_hours = 168  # 7 days
+admin_keys = []
+
+[tunnel.server.rate_limiting]
+enabled = true
+requests_per_minute = 100
+max_concurrent_connections = 10
+max_bandwidth_bps = 10485760  # 10 MB/s
+
+[tunnel.server.ssl]
+enabled = false
+passthrough_enabled = false
+
+[tunnel.server.network]
+bind_address = "0.0.0.0"
+public_bind_address = "0.0.0.0"
+ipv6_enabled = false
+tcp_keepalive = true
+tcp_keepalive_idle = 7200
+tcp_keepalive_interval = 75
+tcp_keepalive_probes = 9
+socket_reuse_address = true
+socket_reuse_port = false

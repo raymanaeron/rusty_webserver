@@ -17,12 +17,16 @@ fn create_test_server_config() -> TunnelServerConfig {
         public_https_port: 8093,
         base_domain: "test.localhost".to_string(),
         max_tunnels: 10,
-        subdomain_strategy: SubdomainStrategy::Random,
-        auth: TunnelServerAuthConfig {
+        subdomain_strategy: SubdomainStrategy::Random,        auth: TunnelServerAuthConfig {
             required: true,
             api_keys: vec!["test-api-key".to_string(), "another-key".to_string()],
             jwt_secret: Some("test-secret".to_string()),
             token_expiry: 3600, // 1 hour
+            jwt_enabled: false,
+            user_registration_enabled: false,
+            api_key_rotation_enabled: false,
+            api_key_rotation_hours: 168, // 7 days
+            admin_keys: vec![],
         },
         network: TunnelServerNetworkConfig {
             bind_address: "127.0.0.1".to_string(),

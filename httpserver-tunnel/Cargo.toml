@@ -41,6 +41,11 @@ http = "1.0"
 # Random number generation for subdomain generation
 rand = "0.8"
 
+# JWT token handling for advanced authentication
+jsonwebtoken = "9.2"
+sha2 = "0.10"
+base64 = "0.22"
+
 [dev-dependencies]
 # Test dependencies
 tempfile = "3.8"
