@@ -1,0 +1,15 @@
+[logging]
+level = "info"
+file_logging = false
+output_mode = "console"
+
+[static_config]
+directory = "./public"
+
+[server]
+# Disable SSL
+[server.ssl]
+enabled = false
+
+[tunnel]
+enabled = false
