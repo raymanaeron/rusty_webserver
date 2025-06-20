@@ -27,19 +27,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Args::parse();
     let port = args.port;
 
-    // Load application configuration first
-    let mut config = Config::load_app_config()?;
-
-    // Override with any CLI-specified config file
-    if let Some(config_path) = &args.config {
-        let cli_config = Config::load_from_file(config_path)?;
-        // Merge CLI config with app config (CLI takes precedence for proxy routes)
-        config.proxy = cli_config.proxy;
-        config.static_config = cli_config.static_config;
-    }
-
-    // Override static directory with CLI argument
-    config.static_config.directory = args.directory;
+    // Load configuration: if --config is specified, load only that file and bypass app_config.toml
+    let config = if let Some(config_path) = &args.config {
+        // When --config is specified, load only that file (don't load app_config.toml)
+        tracing::info!(config_file = %config_path.display(), "Loading configuration from CLI-specified file, bypassing app_config.toml");
+        let mut config = Config::load_from_file(config_path)?;
+        // Override static directory with CLI argument
+        config.static_config.directory = args.directory;
+        config
+    } else {
+        // No --config specified, try to load app_config.toml or use defaults
+        let mut config = Config::load_app_config()?;
+        // Override static directory with CLI argument
+        config.static_config.directory = args.directory;
+        config
+    };
 
     // Initialize logging system with app config
     initialize_logging(&config.logging)?;
