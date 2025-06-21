@@ -80,7 +80,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {    // Initialize tra
         if let Message::Binary(data) = msg {
             if let Ok(tunnel_msg) = TunnelProtocol::deserialize_message(&data) {
                 match tunnel_msg {
-                    TunnelMessage::HttpRequest { id, method, path, headers, body, client_ip } => {
+                    TunnelMessage::HttpRequest { id, method, path, headers, body, client_ip: _ } => {
                         debug!("Received HTTP request {}: {} {}", id, method, path);
                         
                         // Forward request to local server
@@ -110,7 +110,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {    // Initialize tra
                             let _ = sender.send(Message::Binary(data)).await;
                         }
                     }
-                    TunnelMessage::SslConnect { id, initial_data } => {
+                    TunnelMessage::SslConnect { id, initial_data: _ } => {
                         debug!("Received SSL connect request {}", id);
                         // TODO: Handle SSL passthrough connections
                     }
@@ -245,7 +245,7 @@ fn parse_http_response(data: &[u8]) -> HttpResponse {
     let mut headers = HashMap::new();
     let mut body_start = 0;
 
-    for (i, line) in lines.enumerate() {
+    for (_i, line) in lines.enumerate() {
         if line.is_empty() {
             body_start = response_str.find("\r\n\r\n")
                 .or_else(|| response_str.find("\n\n"))

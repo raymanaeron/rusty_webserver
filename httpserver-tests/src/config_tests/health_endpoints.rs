@@ -1,8 +1,8 @@
 // Health endpoint tests for httpserver-config
 use httpserver_config::{ config_health, create_config_health_router };
+use serde_json::Value;
 use axum::http::StatusCode;
 use tower::ServiceExt;
-use serde_json::Value;
 
 #[tokio::test]
 async fn test_config_health_endpoint() {

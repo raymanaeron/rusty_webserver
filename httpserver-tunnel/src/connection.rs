@@ -101,11 +101,11 @@ pub struct TunnelConnection {
     // Connection metrics
     metrics: Arc<RwLock<TunnelMetrics>>,
     connection_start: Option<Instant>,
-    retry_count: u32,
-    
+    retry_count: u32,    
     // Connection info
     public_url: Arc<RwLock<Option<String>>>,
     tunnel_id: Arc<RwLock<Option<String>>>,
+    #[allow(dead_code)]
     session_id: Arc<RwLock<Option<String>>>,
     
     // HTTP client for forwarding requests to local server

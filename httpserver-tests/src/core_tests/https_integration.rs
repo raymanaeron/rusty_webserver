@@ -118,11 +118,11 @@ mod https_integration_tests {
         assert_eq!(ssl_manager.get_wildcard_domain(), Some("*.httpserver.io".to_string()));
 
         // Test SNI certificate selection
-        assert!(ssl_manager.get_certificate_for_sni("api.httpserver.io").is_some());
-        assert!(ssl_manager.get_certificate_for_sni("web.httpserver.io").is_some());        assert!(ssl_manager.get_certificate_for_sni("httpserver.io").is_none()); // Base domain doesn't match wildcard
+        assert!(ssl_manager.get_certificate_for_sni("api.httpserver.io").is_some());        assert!(ssl_manager.get_certificate_for_sni("web.httpserver.io").is_some());
+        assert!(ssl_manager.get_certificate_for_sni("httpserver.io").is_none()); // Base domain doesn't match wildcard
         assert!(ssl_manager.get_certificate_for_sni("sub.api.httpserver.io").is_none()); // Too many subdomains
 
-        let ssl_config = ssl_manager.create_server_config("api.httpserver.io")
+        let _ssl_config = ssl_manager.create_server_config("api.httpserver.io")
             .expect("Failed to create SSL config for wildcard subdomain");
 
         // Verify SSL config was created successfully

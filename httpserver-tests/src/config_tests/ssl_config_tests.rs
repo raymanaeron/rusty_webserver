@@ -5,6 +5,7 @@ use tempfile::TempDir;
 use std::fs;
 
 /// Create a temporary directory with test files
+#[allow(dead_code)]
 fn create_test_directory() -> TempDir {
     let temp_dir = TempDir::new().unwrap();
 
@@ -16,6 +17,7 @@ fn create_test_directory() -> TempDir {
 }
 
 /// Create a test configuration file
+#[allow(dead_code)]
 fn create_test_config_file(temp_dir: &TempDir, content: &str) -> PathBuf {
     let config_path = temp_dir.path().join("ssl_test_config.toml");
     fs::write(&config_path, content).unwrap();

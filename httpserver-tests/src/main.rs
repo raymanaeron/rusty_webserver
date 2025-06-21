@@ -1,8 +1,14 @@
+#[cfg(test)]
 mod config_tests;
+#[cfg(test)]
 mod core_tests;
+#[cfg(test)]
 mod balancer_tests;
+#[cfg(test)]
 mod static_tests;
+#[cfg(test)]
 mod proxy_tests;
+#[cfg(test)]
 mod tunnel_tests;
 
 fn main() {

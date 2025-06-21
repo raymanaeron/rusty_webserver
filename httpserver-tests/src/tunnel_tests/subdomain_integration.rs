@@ -95,7 +95,7 @@ async fn test_subdomain_validation() {
         base_domain: "test.localhost".to_string(),
         ..Default::default()
     };
-      let server = TunnelServer::new(config).expect("Failed to create server");
+    let _server = TunnelServer::new(config).expect("Failed to create server");
     
     // Test that server accepts valid configurations
     // (Validation happens during server creation)

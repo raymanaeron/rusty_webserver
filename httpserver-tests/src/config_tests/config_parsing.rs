@@ -1,22 +1,15 @@
 // Configuration parsing and validation tests
 use httpserver_config::{
-    Config,
-    Args,
-    ProxyRoute,
-    StaticConfig,
-    HttpHealthConfig,
-    WebSocketHealthConfig,
-    LoggingConfig,
-    ApplicationConfig,
-    ServerConfig,
-    TunnelConfig,
+    Config, Args, LoadBalancingStrategy, StaticConfig, LoggingConfig, 
+    ApplicationConfig, ServerConfig, TunnelConfig, ProxyRoute, Target,
+    HttpHealthConfig, WebSocketHealthConfig
 };
-use httpserver_balancer::{ Target, LoadBalancingStrategy };
 use std::path::PathBuf;
 use tempfile::TempDir;
 use std::fs;
 
 /// Create a temporary directory with test files
+#[allow(dead_code)]
 fn create_test_directory() -> TempDir {
     let temp_dir = TempDir::new().unwrap();
 
@@ -28,6 +21,7 @@ fn create_test_directory() -> TempDir {
 }
 
 /// Create a test configuration file
+#[allow(dead_code)]
 fn create_test_config_file(temp_dir: &TempDir, content: &str) -> PathBuf {
     let config_path = temp_dir.path().join("test_config.toml");
     fs::write(&config_path, content).unwrap();
