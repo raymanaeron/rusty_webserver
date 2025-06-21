@@ -1,6 +1,7 @@
 [workspace]
 members = [
-    "httpserver",           # Main binary crate
+    "httpserver-engine",    # Core engine library
+    "httpserver-cli",       # CLI binary (bin: httpserver)
     "httpserver-core",      # Core server functionality
     "httpserver-static",    # Static file serving
     "httpserver-proxy",     # Reverse proxy

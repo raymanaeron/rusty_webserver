@@ -789,23 +789,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
-name = "httpserver"
-version = "0.1.0"
-dependencies = [
- "axum",
- "axum-tungstenite",
- "clap",
- "httpserver-balancer",
- "httpserver-config",
- "httpserver-core",
- "httpserver-proxy",
- "httpserver-static",
- "httpserver-tunnel",
- "tokio",
- "tracing",
-]
-
-[[package]]
 name = "httpserver-balancer"
 version = "0.1.0"
 dependencies = [
@@ -813,6 +796,17 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "httpserver-cli"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "httpserver-config",
+ "httpserver-engine",
  "tokio",
  "tracing",
 ]
@@ -859,6 +853,23 @@ dependencies = [
  "tracing-appender",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "httpserver-engine"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "axum-tungstenite",
+ "clap",
+ "httpserver-balancer",
+ "httpserver-config",
+ "httpserver-core",
+ "httpserver-proxy",
+ "httpserver-static",
+ "httpserver-tunnel",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

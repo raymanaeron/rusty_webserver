@@ -1,0 +1,23 @@
+[package]
+name = "httpserver-engine"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "httpserver_engine"
+path = "src/lib.rs"
+
+[dependencies]
+httpserver-core = { path = "../httpserver-core" }
+httpserver-static = { path = "../httpserver-static" }
+httpserver-config = { path = "../httpserver-config" }
+httpserver-proxy = { path = "../httpserver-proxy" }
+httpserver-balancer = { path = "../httpserver-balancer" }
+httpserver-tunnel = { path = "../httpserver-tunnel" }
+
+# Engine dependencies
+clap = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+axum-tungstenite = { workspace = true }
+tracing = { workspace = true }
