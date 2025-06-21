@@ -37,7 +37,7 @@ Create `config.tunnel-server-production.toml` on your Digital Ocean droplet:
 # This runs on the Digital Ocean droplet
 
 [logging]
-level = "info"
+level = "debug"
 file_logging = true
 logs_directory = "./logs"
 format = "text"
@@ -48,7 +48,8 @@ name = "httpserver-tunnel-server"
 environment = "production"
 
 [server]
-default_port = 80
+# Use a different port for the main server when tunnel server handles public traffic
+default_port = 8080
 request_timeout = 30
 max_request_size_mb = 10
 enable_health_endpoints = true
@@ -74,7 +75,7 @@ enabled = true
 tunnel_port = 8081
 
 # Base domain for tunnel subdomains (replace with your domain)
-base_domain = "yourdomain.com"
+base_domain = "httpserver.io"
 
 # Public HTTP port (where public traffic is served)
 public_port = 80
@@ -181,7 +182,7 @@ Create `config.tunnel-client-home.toml` on your home machine:
 # This connects to the tunnel server and exposes local services
 
 [logging]
-level = "info"
+level = "debug"
 file_logging = true
 logs_directory = "./logs"
 format = "text"
@@ -217,7 +218,7 @@ local_host = "127.0.0.1"
 # Tunnel server endpoint configuration
 [[tunnel.endpoints]]
 # WebSocket URL to your tunnel server (replace with your server's IP/domain)
-server_url = "ws://YOUR_DROPLET_IP:8081/connect"
+server_url = "ws://143.198.102.196:8081/connect"
 
 # Optional: request a specific subdomain
 # subdomain = "myapp"
@@ -258,6 +259,11 @@ verify_server = false
 # Disable tunnel server (this is a client)
 [tunnel.server]
 enabled = false
+
+[[proxy]]
+path = "/api/*"
+target = "http://localhost:3001"
+timeout = 30
 ```
 
 ### 2.2 Start Your Local Web Application
