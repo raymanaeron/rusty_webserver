@@ -32,6 +32,7 @@ pub struct TunnelClient {
     // Client state
     is_running: Arc<RwLock<bool>>,
     local_port: u16,
+    local_host: String,
 }
 
 impl TunnelClient {
@@ -45,8 +46,8 @@ impl TunnelClient {
             return Err(TunnelError::InvalidConfig("No tunnel endpoints configured".to_string()));
         }
 
-        let authenticator = Arc::new(TunnelAuthenticator::new(config.auth.clone())?);
-        let (status_sender, status_receiver) = watch::channel(Vec::new());
+        let authenticator = Arc::new(TunnelAuthenticator::new(config.auth.clone())?);        let (status_sender, status_receiver) = watch::channel(Vec::new());
+        let local_host = config.local_host.clone();
 
         Ok(Self {
             config,
@@ -60,6 +61,7 @@ impl TunnelClient {
             health_check_task: None,
             is_running: Arc::new(RwLock::new(false)),
             local_port,
+            local_host,
         })
     }
 
@@ -110,16 +112,18 @@ impl TunnelClient {
         
         for (index, endpoint) in self.config.endpoints.iter().enumerate() {
             let connection_id = format!("tunnel-{}", index);
-            
-            let connection = TunnelConnection::new(
+              let connection = TunnelConnection::new(
                 endpoint.clone(),
                 self.authenticator.clone(),
                 self.config.reconnection.clone(),
+                self.local_port,
+                &self.local_host,
             );
 
             let connection_arc = Arc::new(connection);
             self.connections.write().await.insert(connection_id.clone(), connection_arc.clone());            // Start connection in background
             let local_port = self.local_port;
+            let local_host = self.local_host.clone();
             let status_monitor = self.status_monitor.clone();
             let mut shutdown_rx_clone = shutdown_tx.subscribe();
             let endpoint_clone = endpoint.clone();
@@ -132,10 +136,12 @@ impl TunnelClient {
                     endpoint_clone,
                     authenticator_clone,
                     reconnection_clone,
+                    local_port,
+                    &local_host,
                 );
                 
                 tokio::select! {
-                    result = connection.start(local_port) => {
+                    result = connection.start() => {
                         match result {
                             Ok(_) => {
                                 tracing::info!("Connection {} established successfully", connection_id_for_task);

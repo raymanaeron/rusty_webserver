@@ -16,6 +16,8 @@ use tokio::time::{interval, sleep};
 use tokio_tungstenite::{connect_async_tls_with_config, tungstenite::Message};
 use tracing;
 use url::Url;
+use reqwest;
+use std::collections::HashMap;
 
 /// Connection state
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -105,17 +107,29 @@ pub struct TunnelConnection {
     public_url: Arc<RwLock<Option<String>>>,
     tunnel_id: Arc<RwLock<Option<String>>>,
     session_id: Arc<RwLock<Option<String>>>,
+    
+    // HTTP client for forwarding requests to local server
+    http_client: reqwest::Client,
+    local_server_url: String,
 }
 
-impl TunnelConnection {
-    /// Create new tunnel connection
+impl TunnelConnection {    /// Create new tunnel connection
     pub fn new(
         endpoint: TunnelEndpoint,
         authenticator: Arc<TunnelAuthenticator>,
         reconnection_config: ReconnectionConfig,
+        local_port: u16,
+        local_host: &str,
     ) -> Self {
         let (status_sender, status_receiver) = watch::channel(ConnectionState::Disconnected);
         let reconnection_strategy = ReconnectionStrategy::from(reconnection_config.clone());
+        
+        let http_client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()
+            .expect("Failed to create HTTP client");
+            
+        let local_server_url = format!("http://{}:{}", local_host, local_port);
         
         Self {
             endpoint,
@@ -132,15 +146,15 @@ impl TunnelConnection {
             public_url: Arc::new(RwLock::new(None)),
             tunnel_id: Arc::new(RwLock::new(None)),
             session_id: Arc::new(RwLock::new(None)),
+            http_client,
+            local_server_url,
         }
-    }
-
-    /// Start tunnel connection with auto-reconnection
-    pub async fn start(&mut self, local_port: u16) -> TunnelResult<()> {
+    }    /// Start tunnel connection with auto-reconnection
+    pub async fn start(&mut self) -> TunnelResult<()> {
         self.set_state(ConnectionState::Connecting).await;
         
         loop {
-            match self.connect_once(local_port).await {
+            match self.connect_once().await {
                 Ok(()) => {
                     // Connection successful, reset retry count
                     self.retry_count = 0;
@@ -193,7 +207,7 @@ impl TunnelConnection {
     }
 
     /// Attempt single connection
-    async fn connect_once(&mut self, _local_port: u16) -> TunnelResult<()> {
+    async fn connect_once(&mut self) -> TunnelResult<()> {
         self.connection_start = Some(Instant::now());
         
         // Parse WebSocket URL
@@ -458,20 +472,48 @@ impl TunnelConnection {
                 Ok(())
             }
         }
-    }
-
-    /// Process tunnel protocol message
+    }    /// Process tunnel protocol message
     async fn process_tunnel_message(&self, message: TunnelMessage) -> TunnelResult<()> {
-        match message {            TunnelMessage::HttpRequest { id, method, path, headers: _, body: _, client_ip: _ } => {
-                // TODO: Forward HTTP request to local server
-                tracing::debug!(id = %id, method = %method, path = %path, "Received HTTP request");
+        match message {
+            TunnelMessage::HttpRequest { id, method, path, headers, body, client_ip } => {
+                tracing::debug!(id = %id, method = %method, path = %path, client_ip = %client_ip, "Received HTTP request, forwarding to local server");
+                
+                // Forward the HTTP request to the local server
+                match self.forward_http_request(&id, &method, &path, headers, body).await {
+                    Ok(response) => {
+                        // Send the response back through the tunnel
+                        if let Some(sender) = &self.message_sender {
+                            if let Err(e) = sender.send(response) {
+                                tracing::error!(id = %id, error = %e, "Failed to send HTTP response through tunnel");
+                            } else {
+                                tracing::debug!(id = %id, "Successfully sent HTTP response through tunnel");
+                            }
+                        } else {
+                            tracing::error!(id = %id, "No message sender available for HTTP response");
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(id = %id, error = %e, "Failed to forward HTTP request to local server");
+                        // Send error response back through tunnel
+                        if let Some(sender) = &self.message_sender {
+                            let error_response = TunnelMessage::HttpResponse {
+                                id: id.clone(),
+                                status: 500,
+                                headers: HashMap::new(),
+                                body: Some(b"Internal Server Error".to_vec()),
+                            };
+                            let _ = sender.send(error_response);
+                        }
+                    }
+                }
                 Ok(())
             }
             TunnelMessage::Pong { timestamp } => {
                 tracing::debug!(timestamp = timestamp, "Received pong");
                 self.update_metrics_on_pong().await;
                 Ok(())
-            }            TunnelMessage::Status { connections, bytes_sent, bytes_received } => {
+            }
+            TunnelMessage::Status { connections, bytes_sent, bytes_received } => {
                 tracing::debug!(
                     connections = connections,
                     bytes_sent = bytes_sent,
@@ -488,6 +530,121 @@ impl TunnelConnection {
             _ => {
                 tracing::warn!("Received unexpected tunnel message");
                 Ok(())
+            }        }
+    }
+
+    /// Forward HTTP request to local server and return response
+    async fn forward_http_request(
+        &self,
+        request_id: &str,
+        method: &str,
+        path: &str,
+        headers: HashMap<String, String>,
+        body: Option<Vec<u8>>,
+    ) -> TunnelResult<TunnelMessage> {
+        let url = format!("{}{}", self.local_server_url, path);
+        
+        tracing::debug!(
+            request_id = %request_id,
+            method = %method,
+            url = %url,
+            headers_count = headers.len(),
+            has_body = body.is_some(),
+            "Forwarding HTTP request to local server"
+        );
+
+        // Build the request
+        let mut request_builder = match method.to_uppercase().as_str() {
+            "GET" => self.http_client.get(&url),
+            "POST" => self.http_client.post(&url),
+            "PUT" => self.http_client.put(&url),
+            "DELETE" => self.http_client.delete(&url),
+            "PATCH" => self.http_client.patch(&url),
+            "HEAD" => self.http_client.head(&url),
+            _ => {
+                tracing::warn!(request_id = %request_id, method = %method, "Unsupported HTTP method");
+                return Ok(TunnelMessage::HttpResponse {
+                    id: request_id.to_string(),
+                    status: 405,
+                    headers: HashMap::new(),
+                    body: Some(b"Method Not Allowed".to_vec()),
+                });
+            }
+        };
+
+        // Add headers (skip host header to avoid conflicts)
+        for (key, value) in headers {
+            if key.to_lowercase() != "host" {
+                request_builder = request_builder.header(&key, &value);
+            }
+        }
+
+        // Add body if present
+        if let Some(body_data) = body {
+            request_builder = request_builder.body(body_data);
+        }
+
+        // Execute the request
+        match request_builder.send().await {
+            Ok(response) => {
+                let status = response.status().as_u16();
+                let mut response_headers = HashMap::new();
+                
+                // Copy response headers
+                for (key, value) in response.headers() {
+                    if let Ok(value_str) = value.to_str() {
+                        response_headers.insert(key.to_string(), value_str.to_string());
+                    }
+                }
+
+                // Get response body
+                let response_body = match response.bytes().await {
+                    Ok(bytes) => {
+                        if bytes.is_empty() {
+                            None
+                        } else {
+                            Some(bytes.to_vec())
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!(request_id = %request_id, error = %e, "Failed to read response body");
+                        None
+                    }
+                };
+
+                tracing::debug!(
+                    request_id = %request_id,
+                    status = status,
+                    headers_count = response_headers.len(),
+                    body_size = response_body.as_ref().map(|b| b.len()).unwrap_or(0),
+                    "Received response from local server"
+                );
+
+                Ok(TunnelMessage::HttpResponse {
+                    id: request_id.to_string(),
+                    status,
+                    headers: response_headers,
+                    body: response_body,
+                })
+            }
+            Err(e) => {
+                tracing::error!(request_id = %request_id, error = %e, "Failed to send request to local server");
+                
+                // Check if it's a connection error
+                let (status, message) = if e.is_connect() {
+                    (503, "Service Unavailable - Local server not reachable")
+                } else if e.is_timeout() {
+                    (504, "Gateway Timeout - Local server timeout")
+                } else {
+                    (502, "Bad Gateway - Local server error")
+                };
+
+                Ok(TunnelMessage::HttpResponse {
+                    id: request_id.to_string(),
+                    status,
+                    headers: HashMap::new(),
+                    body: Some(message.as_bytes().to_vec()),
+                })
             }
         }
     }
