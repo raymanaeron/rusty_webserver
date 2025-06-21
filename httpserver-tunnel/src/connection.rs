@@ -335,9 +335,7 @@ impl TunnelConnection {
         }
         
         Ok(root_store)
-    }
-
-    /// Handle authentication with tunnel server
+    }    /// Handle authentication with tunnel server
     async fn authenticate(
         &self,
         ws_sender: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>, Message>,
@@ -366,49 +364,66 @@ impl TunnelConnection {
         
         ws_sender.send(ws_msg).await
             .map_err(|e| TunnelError::ConnectionFailed(format!("Failed to send auth message: {}", e)))?;        // Wait for authentication response
-        match tokio::time::timeout(Duration::from_secs(30), ws_receiver.next()).await {
-            Ok(Some(Ok(Message::Text(text)))) => {
-                match serde_json::from_str::<TunnelMessage>(&text) {
-                    Ok(TunnelMessage::AuthResponse { success, assigned_subdomain, error }) => {
-                        if success {
-                            tracing::info!("Authentication successful");
-                            if let Some(subdomain) = assigned_subdomain {
-                                // Construct public URL from subdomain and base domain
-                                // This should ideally come from server config but we'll construct it
-                                let public_url = format!("http://{}.httpserver.io", subdomain);
-                                *self.public_url.write().await = Some(public_url);
+        // Keep trying to read messages until we get AuthResponse or timeout
+        let start_time = Instant::now();
+        let timeout_duration = Duration::from_secs(30);
+        
+        loop {
+            if start_time.elapsed() > timeout_duration {
+                return Err(TunnelError::ConnectionFailed("Authentication timeout".to_string()));
+            }
+            
+            match tokio::time::timeout(Duration::from_secs(5), ws_receiver.next()).await {
+                Ok(Some(Ok(Message::Text(text)))) => {
+                    match serde_json::from_str::<TunnelMessage>(&text) {
+                        Ok(TunnelMessage::AuthResponse { success, assigned_subdomain, error }) => {
+                            if success {
+                                tracing::info!("Authentication successful");
+                                if let Some(subdomain) = assigned_subdomain {
+                                    // Construct public URL from subdomain and base domain
+                                    // This should ideally come from server config but we'll construct it
+                                    let public_url = format!("http://{}.httpserver.io", subdomain);
+                                    *self.public_url.write().await = Some(public_url);
+                                }
+                                return Ok(true);
+                            } else {
+                                let error_msg = error.unwrap_or_else(|| "Unknown error".to_string());
+                                tracing::error!(error = %error_msg, "Authentication failed");
+                                return Ok(false);
                             }
-                            Ok(true)
-                        } else {
-                            let error_msg = error.unwrap_or_else(|| "Unknown error".to_string());
-                            tracing::error!(error = %error_msg, "Authentication failed");
-                            Ok(false)
+                        }                        Ok(TunnelMessage::Error { code, message }) => {
+                            return Err(TunnelError::AuthenticationFailed(format!("Auth error {}: {}", code, message)));
                         }
-                    }                    Ok(TunnelMessage::Error { code, message }) => {
-                        Err(TunnelError::AuthenticationFailed(format!("Auth error {}: {}", code, message)))
-                    }
-                    Ok(_) => {
-                        Err(TunnelError::ProtocolError("Unexpected message during authentication".to_string()))
-                    }
-                    Err(e) => {
-                        Err(TunnelError::ProtocolError(format!("Failed to parse auth response: {}", e)))
+                        Ok(other_msg) => {
+                            // Got a non-auth message during authentication - this might be normal
+                            // Log it but continue waiting for AuthResponse
+                            tracing::debug!("Received non-auth message during authentication: {:?}", other_msg);
+                            continue;
+                        }
+                        Err(e) => {
+                            tracing::warn!(error = %e, text = %text, "Failed to parse message during authentication");
+                            continue;
+                        }
                     }
                 }
-            }
-            Ok(Some(Ok(_))) => {
-                Err(TunnelError::ProtocolError("Unexpected message type during authentication".to_string()))
-            }
-            Ok(Some(Err(e))) => {
-                Err(TunnelError::ConnectionFailed(format!("WebSocket error during auth: {}", e)))
-            }
-            Ok(None) => {
-                Err(TunnelError::ConnectionFailed("Connection closed during authentication".to_string()))
-            }
-            Err(_) => {
-                Err(TunnelError::ConnectionFailed("Authentication timeout".to_string()))
+                Ok(Some(Ok(_))) => {
+                    // Non-text message during auth, continue waiting
+                    tracing::debug!("Received non-text message during authentication");
+                    continue;
+                }
+                Ok(Some(Err(e))) => {
+                    return Err(TunnelError::ConnectionFailed(format!("WebSocket error during auth: {}", e)));
+                }
+                Ok(None) => {
+                    return Err(TunnelError::ConnectionFailed("Connection closed during authentication".to_string()));
+                }
+                Err(_) => {
+                    // Timeout on this iteration, continue the loop
+                    continue;
+                }
             }
         }
-    }    /// Handle incoming WebSocket message
+    }/// Handle incoming WebSocket message
     async fn handle_websocket_message(&self, message: Message) -> TunnelResult<()> {
         match message {
             Message::Text(text) => {
