@@ -200,10 +200,10 @@ impl TunnelServer {
         )?;
 
         Ok(())
-    }
-    /// Create router for public traffic (subdomain routing)
+    }    /// Create router for public traffic (subdomain routing)
     fn create_public_router(&self) -> Router {
         Router::new()
+            .route("/", any(Self::handle_public_request))
             .route("/*path", any(Self::handle_public_request))
             .layer(
                 ServiceBuilder::new()

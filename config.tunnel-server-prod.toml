@@ -2,7 +2,7 @@
 # This runs on the Digital Ocean droplet
 
 [logging]
-level = "info"
+level = "debug"
 file_logging = true
 logs_directory = "./logs"
 format = "text"
