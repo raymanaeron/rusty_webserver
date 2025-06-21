@@ -1,0 +1,79 @@
+
+[logging]
+level = "info"
+file_logging = true
+logs_directory = "./logs"
+format = "text"
+output_mode = "both"
+
+[application]
+name = "httpserver-tunnel-client"
+environment = "development"
+
+[server]
+default_port = 3000
+request_timeout = 30
+enable_health_endpoints = true
+
+# DISABLE SSL for this example
+[server.ssl]
+enabled = false
+
+[static_config]
+directory = "./website"
+fallback = "index.html"
+
+# TUNNEL CLIENT CONFIGURATION
+[tunnel]
+enabled = true
+
+# Local port that will be tunneled (your local web server)
+local_port = 3000
+
+# Local host to bind to
+local_host = "127.0.0.1"
+
+# Tunnel server endpoint configuration
+[[tunnel.endpoints]]
+# WebSocket URL to your tunnel server (replace with your server's IP/domain)
+server_url = "ws://143.198.102.196:8081/connect"
+
+# Optional: request a specific subdomain
+# subdomain = "myapp"
+
+# Protocol version
+protocol_version = "1.0"
+
+# Connection settings
+connection_timeout = 30
+keepalive_interval = 30
+max_connections = 100
+
+# Authentication (must match server configuration)
+[tunnel.auth]
+method = "api_key"
+api_key = "your-secret-api-key-here"
+
+# Auto-reconnection settings
+[tunnel.reconnection]
+enabled = true
+initial_delay = 1
+max_delay = 300
+backoff_multiplier = 2.0
+max_attempts = 0  # Unlimited retries
+jitter_factor = 0.1
+
+# Monitoring
+[tunnel.monitoring]
+enabled = true
+health_interval = 60
+collect_metrics = true
+log_events = true
+
+# DISABLE SSL for tunnel connections
+[tunnel.ssl]
+verify_server = false
+
+# Disable tunnel server (this is a client)
+[tunnel.server]
+enabled = false

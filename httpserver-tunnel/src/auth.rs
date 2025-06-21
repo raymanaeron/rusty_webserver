@@ -256,15 +256,20 @@ impl TunnelAuthenticator {
             .await
             .map_err(|e| TunnelError::NetworkError(format!("Validation request failed: {}", e)))?;
 
-        let is_valid = response.status().is_success();
-        
-        if is_valid {
-            tracing::info!("Tunnel authentication validated successfully");
-        } else {
-            tracing::warn!(status = %response.status(), "Tunnel authentication validation failed");
+        match response.status() {
+            status if status.is_success() => {
+                tracing::info!("Tunnel authentication validated successfully");
+                Ok(true)
+            }
+            reqwest::StatusCode::NOT_FOUND => {
+                tracing::info!("Validation endpoint not found - will authenticate during WebSocket connection");
+                Ok(true)  // Continue with connection, real auth happens during WebSocket handshake
+            }
+            status => {
+                tracing::warn!(status = %status, "Tunnel authentication validation failed");
+                Ok(false)
+            }
         }
-
-        Ok(is_valid)
     }
 
     /// Get authentication method

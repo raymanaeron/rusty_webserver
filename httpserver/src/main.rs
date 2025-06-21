@@ -10,7 +10,7 @@ use httpserver_core::{
 use httpserver_static::{ StaticHandler, create_static_health_router };
 use httpserver_proxy::ProxyHandler;
 use httpserver_balancer::create_balancer_health_router;
-use httpserver_tunnel::server::TunnelServer;
+use httpserver_tunnel::{server::TunnelServer, TunnelClient};
 use axum::{
     Router,
     extract::{ Request, ConnectInfo },
@@ -110,30 +110,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         None
     };
 
-    // Initialize tunnel server if configured
-    let tunnel_server = if config.tunnel.enabled {
-        tracing::info!("Tunnel server enabled, initializing");
-        let server = TunnelServer::new(config.tunnel.server.clone())?;
-        
-        // Start tunnel server in background
-        let tunnel_handle = {
-            let server = server;
-            tokio::spawn(async move {
-                if let Err(e) = server.start().await {
-                    tracing::error!("Tunnel server error: {}", e);
+    // Initialize tunnel functionality if configured
+    let tunnel_handle = if config.tunnel.enabled {
+        if config.tunnel.server.enabled {
+            // Start tunnel server
+            tracing::info!("Tunnel server enabled, initializing");
+            let server = TunnelServer::new(config.tunnel.server.clone())?;
+            
+            let tunnel_handle = {
+                let server = server;
+                tokio::spawn(async move {
+                    if let Err(e) = server.start().await {
+                        tracing::error!("Tunnel server error: {}", e);
+                    }
+                })
+            };
+            
+            tracing::info!(
+                port = config.tunnel.server.tunnel_port,
+                base_domain = %config.tunnel.server.base_domain,
+                "Tunnel server started"
+            );
+            
+            Some(tunnel_handle)
+        } else {
+            // Start tunnel client
+            tracing::info!("Tunnel client enabled, initializing");
+            
+            let mut client = TunnelClient::new(config.tunnel.clone(), port)?;
+            
+            let tunnel_handle = tokio::spawn(async move {
+                if let Err(e) = client.start().await {
+                    tracing::error!("Tunnel client error: {}", e);
+                } else {
+                    tracing::info!("Tunnel client started successfully");
+                    // Keep the client running
+                    tokio::signal::ctrl_c().await.expect("Failed to listen for ctrl+c");
+                    tracing::info!("Tunnel client shutting down");
                 }
-            })
-        };
-        
-        tracing::info!(
-            port = config.tunnel.server.tunnel_port,
-            base_domain = %config.tunnel.server.base_domain,
-            "Tunnel server started"
-        );
-        
-        Some(tunnel_handle)
+            });
+            
+            tracing::info!("Tunnel client started");
+            Some(tunnel_handle)
+        }
     } else {
-        tracing::info!("Tunnel server disabled");
+        tracing::info!("Tunnel functionality disabled");
         None
     };
 
@@ -149,18 +170,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     // Start tunnel server and main server (on different ports if needed)
-    if let Some(tunnel_handle) = tunnel_server {
+    if let Some(tunnel_handle) = tunnel_handle {
         // If tunnel server public_port conflicts with main server port, run only tunnel server
-        if config.tunnel.server.public_port == port {
+        if config.tunnel.server.enabled && config.tunnel.server.public_port == port {
             tracing::info!("Tunnel server handles public traffic on port {} - skipping main HTTP server", port);
             
             // Wait for tunnel server to complete
             if let Err(e) = tunnel_handle.await {
-                tracing::error!("Tunnel server task error: {}", e);
+                tracing::error!("Tunnel task error: {}", e);
                 return Err(e.into());
             }
         } else {
-            tracing::info!("Starting main HTTP server and tunnel server on different ports");
+            tracing::info!("Starting main HTTP server and tunnel concurrently");
             
             let main_server_future = server.start(app);
             
@@ -171,16 +192,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     result?;
                 }
                 result = tunnel_handle => {
-                    tracing::info!("Tunnel server completed");
+                    tracing::info!("Tunnel task completed");
                     if let Err(e) = result {
-                        tracing::error!("Tunnel server task error: {}", e);
+                        tracing::error!("Tunnel task error: {}", e);
                         return Err(e.into());
                     }
                 }
             }
         }
     } else {
-        // No tunnel server, start main server
+        // No tunnel, just start main server
         tracing::info!("Starting main HTTP server only");
         server.start(app).await?;
     }
