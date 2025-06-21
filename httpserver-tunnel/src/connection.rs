@@ -5,6 +5,7 @@ use crate::{TunnelError, TunnelResult};
 use crate::auth::{TunnelAuthenticator, TunnelCredentials};
 use crate::config::{TunnelEndpoint, ReconnectionConfig};
 use crate::status::{ConnectionHealth, TunnelMetrics};
+use crate::protocol::TunnelMessage;
 
 use futures_util::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
@@ -80,72 +81,6 @@ impl From<ReconnectionConfig> for ReconnectionStrategy {
             jitter_factor: config.jitter_factor,
         }
     }
-}
-
-/// Tunnel protocol messages
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum TunnelMessage {
-    /// Authentication request
-    Auth {
-        credentials: String,
-        user_agent: String,
-        protocol_version: String,
-    },
-    /// Authentication response
-    AuthResponse {
-        success: bool,
-        message: String,
-        assigned_url: Option<String>,
-        session_id: Option<String>,
-    },
-    /// Tunnel establishment request
-    TunnelRequest {
-        subdomain: Option<String>,
-        local_port: u16,
-        protocol: String,
-    },
-    /// Tunnel establishment response
-    TunnelResponse {
-        success: bool,
-        public_url: String,
-        tunnel_id: String,
-        message: String,
-    },
-    /// HTTP request forwarding
-    HttpRequest {
-        id: String,
-        method: String,
-        path: String,
-        headers: std::collections::HashMap<String, String>,
-        body: Vec<u8>,
-    },
-    /// HTTP response forwarding
-    HttpResponse {
-        id: String,
-        status: u16,
-        headers: std::collections::HashMap<String, String>,
-        body: Vec<u8>,
-    },
-    /// Ping for keep-alive
-    Ping {
-        timestamp: i64,
-    },
-    /// Pong response
-    Pong {
-        timestamp: i64,
-    },
-    /// Connection status update
-    Status {
-        connected_clients: u32,
-        bytes_transferred: u64,
-        uptime: u64,
-    },
-    /// Error message
-    Error {
-        code: String,
-        message: String,
-    },
 }
 
 /// Tunnel connection manager
@@ -358,7 +293,7 @@ impl TunnelConnection {
                 // Send keep-alive ping
                 _ = keepalive_timer.tick() => {
                     let ping_msg = TunnelMessage::Ping {
-                        timestamp: chrono::Utc::now().timestamp(),
+                        timestamp: chrono::Utc::now().timestamp() as u64,
                     };
                     let ws_msg = Message::Text(serde_json::to_string(&ping_msg).unwrap());
                     if let Err(e) = ws_sender.send(ws_msg).await {
@@ -416,14 +351,20 @@ impl TunnelConnection {
         ws_sender: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>, Message>,
         ws_receiver: &mut futures_util::stream::SplitStream<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>>,
         credentials: &TunnelCredentials,
-    ) -> TunnelResult<bool> {
-        // Create authentication message
+    ) -> TunnelResult<bool> {        // Create authentication message
         let auth_header = credentials.headers.get("Authorization")
             .ok_or_else(|| TunnelError::AuthenticationFailed("No authorization header".to_string()))?;
         
+        // Extract token from "Bearer token" format
+        let token = if auth_header.starts_with("Bearer ") {
+            auth_header.trim_start_matches("Bearer ").to_string()
+        } else {
+            auth_header.clone()
+        };
+        
         let auth_msg = TunnelMessage::Auth {
-            credentials: auth_header.clone(),
-            user_agent: "httpserver-tunnel/1.0".to_string(),
+            token,
+            subdomain: self.endpoint.subdomain.clone(),
             protocol_version: self.endpoint.protocol_version.clone(),
         };
 
@@ -432,28 +373,26 @@ impl TunnelConnection {
             .map_err(|e| TunnelError::ProtocolError(format!("Failed to serialize auth message: {}", e)))?);
         
         ws_sender.send(ws_msg).await
-            .map_err(|e| TunnelError::ConnectionFailed(format!("Failed to send auth message: {}", e)))?;
-
-        // Wait for authentication response
+            .map_err(|e| TunnelError::ConnectionFailed(format!("Failed to send auth message: {}", e)))?;        // Wait for authentication response
         match tokio::time::timeout(Duration::from_secs(30), ws_receiver.next()).await {
             Ok(Some(Ok(Message::Text(text)))) => {
                 match serde_json::from_str::<TunnelMessage>(&text) {
-                    Ok(TunnelMessage::AuthResponse { success, message, assigned_url, session_id }) => {
+                    Ok(TunnelMessage::AuthResponse { success, assigned_subdomain, error }) => {
                         if success {
-                            tracing::info!(message = %message, "Authentication successful");
-                            if let Some(url) = assigned_url {
-                                *self.public_url.write().await = Some(url);
-                            }
-                            if let Some(id) = session_id {
-                                *self.session_id.write().await = Some(id);
+                            tracing::info!("Authentication successful");
+                            if let Some(subdomain) = assigned_subdomain {
+                                // Construct public URL from subdomain and base domain
+                                // This should ideally come from server config but we'll construct it
+                                let public_url = format!("http://{}.httpserver.io", subdomain);
+                                *self.public_url.write().await = Some(public_url);
                             }
                             Ok(true)
                         } else {
-                            tracing::error!(message = %message, "Authentication failed");
+                            let error_msg = error.unwrap_or_else(|| "Unknown error".to_string());
+                            tracing::error!(error = %error_msg, "Authentication failed");
                             Ok(false)
                         }
-                    }
-                    Ok(TunnelMessage::Error { code, message }) => {
+                    }                    Ok(TunnelMessage::Error { code, message }) => {
                         Err(TunnelError::AuthenticationFailed(format!("Auth error {}: {}", code, message)))
                     }
                     Ok(_) => {
@@ -484,64 +423,10 @@ impl TunnelConnection {
         &self,
         ws_sender: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>, Message>,
         ws_receiver: &mut futures_util::stream::SplitStream<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>>,
-        local_port: u16,
-    ) -> TunnelResult<bool> {
-        let tunnel_msg = TunnelMessage::TunnelRequest {
-            subdomain: self.endpoint.subdomain.clone(),
-            local_port,
-            protocol: "http".to_string(),
-        };
-
-        let ws_msg = Message::Text(serde_json::to_string(&tunnel_msg)
-            .map_err(|e| TunnelError::ProtocolError(format!("Failed to serialize tunnel request: {}", e)))?);
-        
-        ws_sender.send(ws_msg).await
-            .map_err(|e| TunnelError::ConnectionFailed(format!("Failed to send tunnel request: {}", e)))?;
-
-        // Wait for tunnel response
-        match tokio::time::timeout(Duration::from_secs(30), ws_receiver.next()).await {
-            Ok(Some(Ok(Message::Text(text)))) => {
-                match serde_json::from_str::<TunnelMessage>(&text) {
-                    Ok(TunnelMessage::TunnelResponse { success, public_url, tunnel_id, message }) => {
-                        if success {
-                            tracing::info!(
-                                public_url = %public_url,
-                                tunnel_id = %tunnel_id,
-                                message = %message,
-                                "Tunnel established"
-                            );
-                            *self.public_url.write().await = Some(public_url);
-                            *self.tunnel_id.write().await = Some(tunnel_id);
-                            Ok(true)
-                        } else {
-                            tracing::error!(message = %message, "Tunnel establishment failed");
-                            Ok(false)
-                        }
-                    }
-                    Ok(TunnelMessage::Error { code, message }) => {
-                        Err(TunnelError::ProtocolError(format!("Tunnel error {}: {}", code, message)))
-                    }
-                    Ok(_) => {
-                        Err(TunnelError::ProtocolError("Unexpected message during tunnel setup".to_string()))
-                    }
-                    Err(e) => {
-                        Err(TunnelError::ProtocolError(format!("Failed to parse tunnel response: {}", e)))
-                    }
-                }
-            }
-            Ok(Some(Ok(_))) => {
-                Err(TunnelError::ProtocolError("Unexpected message type during tunnel setup".to_string()))
-            }
-            Ok(Some(Err(e))) => {
-                Err(TunnelError::ConnectionFailed(format!("WebSocket error during tunnel setup: {}", e)))
-            }
-            Ok(None) => {
-                Err(TunnelError::ConnectionFailed("Connection closed during tunnel setup".to_string()))
-            }
-            Err(_) => {
-                Err(TunnelError::ConnectionFailed("Tunnel setup timeout".to_string()))
-            }
-        }
+        local_port: u16,    ) -> TunnelResult<bool> {
+        // After successful authentication, the tunnel is established
+        // No separate tunnel request needed - server assigns subdomain during auth
+        Ok(true)
     }
 
     /// Handle incoming WebSocket message
@@ -583,7 +468,7 @@ impl TunnelConnection {
 
     /// Process tunnel protocol message
     async fn process_tunnel_message(&self, message: TunnelMessage) -> TunnelResult<()> {
-        match message {            TunnelMessage::HttpRequest { id, method, path, headers: _, body: _ } => {
+        match message {            TunnelMessage::HttpRequest { id, method, path, headers: _, body: _, client_ip: _ } => {
                 // TODO: Forward HTTP request to local server
                 tracing::debug!(id = %id, method = %method, path = %path, "Received HTTP request");
                 Ok(())
@@ -592,15 +477,14 @@ impl TunnelConnection {
                 tracing::debug!(timestamp = timestamp, "Received pong");
                 self.update_metrics_on_pong().await;
                 Ok(())
-            }
-            TunnelMessage::Status { connected_clients, bytes_transferred, uptime } => {
+            }            TunnelMessage::Status { connections, bytes_sent, bytes_received } => {
                 tracing::debug!(
-                    clients = connected_clients,
-                    bytes = bytes_transferred,
-                    uptime = uptime,
+                    connections = connections,
+                    bytes_sent = bytes_sent,
+                    bytes_received = bytes_received,
                     "Received status update"
                 );
-                self.update_server_metrics(connected_clients, bytes_transferred, uptime).await;
+                self.update_server_metrics(connections, bytes_sent, bytes_received).await;
                 Ok(())
             }
             TunnelMessage::Error { code, message } => {
@@ -656,14 +540,13 @@ impl TunnelConnection {
         let mut metrics = self.metrics.write().await;
         metrics.last_ping_time = Some(chrono::Utc::now());
         metrics.total_pings += 1;
-    }
-
-    /// Update server metrics
-    async fn update_server_metrics(&self, clients: u32, bytes: u64, uptime: u64) {
+    }    /// Update server metrics
+    async fn update_server_metrics(&self, connections: u32, bytes_sent: u64, bytes_received: u64) {
         let mut metrics = self.metrics.write().await;
-        metrics.connected_clients = clients;
-        metrics.bytes_transferred = bytes;
-        metrics.server_uptime = Duration::from_secs(uptime);
+        // Map new field names to existing metrics structure
+        metrics.connected_clients = connections;
+        metrics.bytes_transferred = bytes_sent + bytes_received; // Combined for now
+        // Keep server_uptime as is since we don't have uptime in new protocol
     }
 
     /// Get connection metrics
