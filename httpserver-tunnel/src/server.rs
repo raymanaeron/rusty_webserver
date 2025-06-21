@@ -377,14 +377,20 @@ impl TunnelServer {    /// Create new tunnel server
 
             // Clean up tunnel on disconnect
             Self::cleanup_tunnel(&tunnel_id_clone, &state_clone).await;
-        });// Handle outgoing requests to tunnel client
+        });        // Handle outgoing requests to tunnel client
         let sender_for_outgoing = sender_handle.clone();
         let outgoing_task = tokio::spawn(async move {
             while let Some(request_msg) = request_receiver.recv().await {
-                if let Ok(data) = TunnelProtocol::serialize_message(&request_msg) {
-                    let mut sender_guard = sender_for_outgoing.lock().await;
-                    if let Err(e) = sender_guard.send(axum::extract::ws::Message::Binary(data)).await {
-                        error!("Failed to send request to tunnel: {}", e);
+                match serde_json::to_string(&request_msg) {
+                    Ok(text) => {
+                        let mut sender_guard = sender_for_outgoing.lock().await;
+                        if let Err(e) = sender_guard.send(axum::extract::ws::Message::Text(text)).await {
+                            error!("Failed to send request to tunnel: {}", e);
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        error!("Failed to serialize request message: {}", e);
                         break;
                     }
                 }
@@ -626,10 +632,15 @@ impl TunnelServer {    /// Create new tunnel server
         message: &TunnelMessage,
         sender: &Arc<tokio::sync::Mutex<futures_util::stream::SplitSink<axum::extract::ws::WebSocket, axum::extract::ws::Message>>>,
     ) {
-        if let Ok(data) = TunnelProtocol::serialize_message(message) {
-            let mut sender_guard = sender.lock().await;
-            if let Err(e) = sender_guard.send(axum::extract::ws::Message::Binary(data)).await {
-                error!("Failed to send tunnel message: {}", e);
+        match serde_json::to_string(message) {
+            Ok(text) => {
+                let mut sender_guard = sender.lock().await;
+                if let Err(e) = sender_guard.send(axum::extract::ws::Message::Text(text)).await {
+                    error!("Failed to send tunnel message: {}", e);
+                }
+            }
+            Err(e) => {
+                error!("Failed to serialize tunnel message: {}", e);
             }
         }
     }
