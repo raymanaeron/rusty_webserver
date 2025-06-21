@@ -60,7 +60,7 @@ enable_health_endpoints = true
 
 # SSL/TLS configuration
 [server.ssl]
-enabled = true
+enabled = false
 https_port = 8443
 
 # Main SSL certificate files

@@ -77,3 +77,8 @@ verify_server = false
 # Disable tunnel server (this is a client)
 [tunnel.server]
 enabled = false
+
+[[proxy]]
+path = "/api/*"
+target = "http://localhost:3001"
+timeout = 30
