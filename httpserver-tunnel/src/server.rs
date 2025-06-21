@@ -221,8 +221,7 @@ impl TunnelServer {
             .route("/connect", get(Self::handle_tunnel_connection))
             .route("/health", get(Self::handle_health_check))
             .with_state(self.state.clone())
-    }
-    /// Handle incoming public HTTP requests
+    }    /// Handle incoming public HTTP requests
     async fn handle_public_request(
         State(state): State<Arc<TunnelServerState>>,
         method: Method,
@@ -234,27 +233,47 @@ impl TunnelServer {
         let host = match headers.get("host") {
             Some(host) => host.to_str().unwrap_or(""),
             None => {
+                error!("HTTP request missing Host header");
                 return (StatusCode::BAD_REQUEST, "Missing Host header").into_response();
             }
         };
 
+        info!("Public HTTP request: {} {} from host: {}", method, uri, host);
+
         // Try to find tunnel by subdomain first, then by custom domain
-        let tunnel_id = if
-            let Some(subdomain) = Self::extract_subdomain(host, &state.config.base_domain)
-        {
+        let subdomain = Self::extract_subdomain(host, &state.config.base_domain);
+        info!("Extracted subdomain: {:?} from host: {} with base domain: {}", subdomain, host, state.config.base_domain);
+        
+        let tunnel_id = if let Some(subdomain) = &subdomain {
             // Standard subdomain routing (e.g., abc123.httpserver.io)
-            state.subdomain_manager.get_tunnel_for_subdomain(&subdomain).await
+            let tunnel_for_subdomain = state.subdomain_manager.get_tunnel_for_subdomain(subdomain).await;
+            info!("Tunnel for subdomain '{}': {:?}", subdomain, tunnel_for_subdomain);
+            tunnel_for_subdomain
         } else {
             // Check if it's a custom domain (e.g., myapp.com)
+            info!("No subdomain extracted, checking custom domain for: {}", host);
             state.subdomain_manager.get_tunnel_for_custom_domain(host).await
-        };
-
-        let tunnel_id = match tunnel_id {
-            Some(id) => id,
+        };        let tunnel_id = match tunnel_id {
+            Some(id) => {
+                info!("Found tunnel ID: {} for host: {}", id, host);
+                id
+            },
             None => {
+                // Debug: Show all active tunnels
+                let tunnels = state.active_tunnels.read().await;
+                let tunnel_count = tunnels.len();
+                info!("No tunnel found for host: {}. Active tunnels ({}): {:?}", 
+                      host, tunnel_count, 
+                      tunnels.keys().collect::<Vec<_>>());
+                if tunnel_count > 0 {
+                    for (tid, tunnel) in tunnels.iter() {
+                        info!("  Tunnel {}: subdomain '{}', authenticated: {}", 
+                              tid, tunnel.subdomain, tunnel.authenticated);
+                    }
+                }
                 return (StatusCode::NOT_FOUND, "Tunnel not found for this domain").into_response();
             }
-        }; // Get the tunnel connection
+        };// Get the tunnel connection
         let tunnel = {
             let tunnels = state.active_tunnels.read().await;
             match tunnels.get(&tunnel_id) {
