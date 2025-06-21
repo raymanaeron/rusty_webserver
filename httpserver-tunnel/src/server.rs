@@ -1,30 +1,29 @@
 // Phase 7.2 Tunnel Server - Public HTTP Server Integration
 // Tunnel server that accepts WebSocket connections from tunnel clients and routes public traffic
 
-use crate::{TunnelError, config::TunnelServerConfig, protocol::{TunnelMessage, TunnelProtocol}};
+use crate::{ TunnelError, config::TunnelServerConfig, protocol::{ TunnelMessage, TunnelProtocol } };
 use crate::subdomain::SubdomainManager;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use std::cmp::min;
-use base64::{Engine as _, engine::general_purpose};
-use tokio::sync::{RwLock, broadcast, mpsc, oneshot};
-use futures_util::{SinkExt, StreamExt};
+use base64::{ Engine as _, engine::general_purpose };
+use tokio::sync::{ RwLock, broadcast, mpsc, oneshot };
+use futures_util::{ SinkExt, StreamExt };
 use uuid::Uuid;
 use axum::{
-    extract::{State, WebSocketUpgrade, ConnectInfo},
-    http::{HeaderMap, Method, StatusCode, Uri},
-    middleware,
-    response::{IntoResponse, Response},
-    routing::{any, get},
+    extract::{ State, WebSocketUpgrade, ConnectInfo },
+    http::{ HeaderMap, Method, StatusCode, Uri },
+    response::{ IntoResponse, Response },
+    routing::{ any, get },
     Router,
 };
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
-use tracing::{info, warn, error, debug};
-use tokio::net::{TcpListener, TcpStream};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tracing::{ info, warn, error, debug };
+use tokio::net::{ TcpListener, TcpStream };
+use tokio::io::{ AsyncReadExt, AsyncWriteExt };
 
 /// TLS stream type for SSL passthrough
 pub enum TlsStream {
@@ -57,7 +56,7 @@ pub struct ActiveTunnel {
     pub id: String,
     pub subdomain: String,
     pub client_ip: String,
-    pub user_info: Option<String>,  // User extracted from token
+    pub user_info: Option<String>, // User extracted from token
     pub authenticated: bool,
     pub connected_at: std::time::SystemTime,
     pub request_sender: mpsc::Sender<TunnelMessage>,
@@ -93,17 +92,20 @@ pub struct TunnelServer {
     state: Arc<TunnelServerState>,
 }
 
-impl TunnelServer {    /// Create new tunnel server
+impl TunnelServer {
+    /// Create new tunnel server
     pub fn new(config: TunnelServerConfig) -> ServerResult<Self> {
         let (shutdown_sender, _) = broadcast::channel(100);
-        
+
         // Create subdomain manager with persistent storage
-        let storage_path = std::env::current_dir()
+        let storage_path = std::env
+            ::current_dir()
             .unwrap_or_else(|_| std::path::PathBuf::from("."))
             .join("tunnel_data")
             .join("subdomains.json");
-            
-        let subdomain_manager = SubdomainManager::new(config.clone(), storage_path);        let state = Arc::new(TunnelServerState {
+
+        let subdomain_manager = SubdomainManager::new(config.clone(), storage_path);
+        let state = Arc::new(TunnelServerState {
             config: config.clone(),
             active_tunnels: RwLock::new(HashMap::new()),
             subdomain_manager,
@@ -115,7 +117,8 @@ impl TunnelServer {    /// Create new tunnel server
         });
 
         Ok(Self { config, state })
-    }    /// Start the tunnel server
+    }
+    /// Start the tunnel server
     pub async fn start(&self) -> ServerResult<()> {
         if !self.config.enabled {
             info!("Tunnel server is disabled");
@@ -123,14 +126,17 @@ impl TunnelServer {    /// Create new tunnel server
         }
 
         // Initialize subdomain manager
-        self.state.subdomain_manager.initialize().await
-            .map_err(|e| TunnelError::InternalError(format!("Failed to initialize subdomain manager: {}", e)))?;
+        self.state.subdomain_manager
+            .initialize().await
+            .map_err(|e|
+                TunnelError::InternalError(format!("Failed to initialize subdomain manager: {}", e))
+            )?;
 
         info!("Starting tunnel server on port {}", self.config.tunnel_port);
 
         // Create the main router for public traffic
         let public_router = self.create_public_router();
-        
+
         // Create the tunnel WebSocket endpoint
         let tunnel_router = self.create_tunnel_router();
 
@@ -143,15 +149,21 @@ impl TunnelServer {    /// Create new tunnel server
         let state_for_cleanup = self.state.clone();
         tokio::spawn(async move {
             Self::cleanup_expired_requests(state_for_cleanup).await;
-        });// Start both servers concurrently
+        }); // Start both servers concurrently
         let public_addr = SocketAddr::new(
-            self.config.network.public_bind_address.parse()
-                .map_err(|e| TunnelError::ConfigError(format!("Invalid public bind address: {}", e)))?,
+            self.config.network.public_bind_address
+                .parse()
+                .map_err(|e|
+                    TunnelError::ConfigError(format!("Invalid public bind address: {}", e))
+                )?,
             self.config.public_port
         );
         let tunnel_addr = SocketAddr::new(
-            self.config.network.bind_address.parse()
-                .map_err(|e| TunnelError::ConfigError(format!("Invalid tunnel bind address: {}", e)))?,
+            self.config.network.bind_address
+                .parse()
+                .map_err(|e|
+                    TunnelError::ConfigError(format!("Invalid tunnel bind address: {}", e))
+                )?,
             self.config.tunnel_port
         );
 
@@ -160,25 +172,36 @@ impl TunnelServer {    /// Create new tunnel server
 
         // Run both servers
         let public_server = axum::serve(
-            tokio::net::TcpListener::bind(public_addr).await
-                .map_err(|e| TunnelError::NetworkError(format!("Failed to bind public address: {}", e)))?,
-            public_router,
+            tokio::net::TcpListener
+                ::bind(public_addr).await
+                .map_err(|e|
+                    TunnelError::NetworkError(format!("Failed to bind public address: {}", e))
+                )?,
+            public_router
         );
 
         let tunnel_server = axum::serve(
-            tokio::net::TcpListener::bind(tunnel_addr).await
-                .map_err(|e| TunnelError::NetworkError(format!("Failed to bind tunnel address: {}", e)))?,
-            tunnel_router.into_make_service_with_connect_info::<SocketAddr>(),
+            tokio::net::TcpListener
+                ::bind(tunnel_addr).await
+                .map_err(|e|
+                    TunnelError::NetworkError(format!("Failed to bind tunnel address: {}", e))
+                )?,
+            tunnel_router.into_make_service_with_connect_info::<SocketAddr>()
         );
 
         // Run both servers concurrently
         tokio::try_join!(
-            async { public_server.await.map_err(|e| TunnelError::NetworkError(e.to_string())) },
-            async { tunnel_server.await.map_err(|e| TunnelError::NetworkError(e.to_string())) }
+            async {
+                public_server.await.map_err(|e| TunnelError::NetworkError(e.to_string()))
+            },
+            async {
+                tunnel_server.await.map_err(|e| TunnelError::NetworkError(e.to_string()))
+            }
         )?;
 
         Ok(())
-    }    /// Create router for public traffic (subdomain routing)
+    }
+    /// Create router for public traffic (subdomain routing)
     fn create_public_router(&self) -> Router {
         Router::new()
             .route("/*path", any(Self::handle_public_request))
@@ -187,7 +210,7 @@ impl TunnelServer {    /// Create new tunnel server
                     .layer(CorsLayer::permissive())
                     // Add middleware to ensure HTTP-only responses
                     .layer(axum::middleware::from_fn(Self::add_http_headers))
-                    .into_inner(),
+                    .into_inner()
             )
             .with_state(self.state.clone())
     }
@@ -198,14 +221,16 @@ impl TunnelServer {    /// Create new tunnel server
             .route("/connect", get(Self::handle_tunnel_connection))
             .route("/health", get(Self::handle_health_check))
             .with_state(self.state.clone())
-    }    /// Handle incoming public HTTP requests
+    }
+    /// Handle incoming public HTTP requests
     async fn handle_public_request(
         State(state): State<Arc<TunnelServerState>>,
         method: Method,
         uri: Uri,
         headers: HeaderMap,
-        body: axum::body::Bytes,
-    ) -> Response {        // Extract subdomain or custom domain from Host header
+        body: axum::body::Bytes
+    ) -> Response {
+        // Extract subdomain or custom domain from Host header
         let host = match headers.get("host") {
             Some(host) => host.to_str().unwrap_or(""),
             None => {
@@ -214,7 +239,9 @@ impl TunnelServer {    /// Create new tunnel server
         };
 
         // Try to find tunnel by subdomain first, then by custom domain
-        let tunnel_id = if let Some(subdomain) = Self::extract_subdomain(host, &state.config.base_domain) {
+        let tunnel_id = if
+            let Some(subdomain) = Self::extract_subdomain(host, &state.config.base_domain)
+        {
             // Standard subdomain routing (e.g., abc123.httpserver.io)
             state.subdomain_manager.get_tunnel_for_subdomain(&subdomain).await
         } else {
@@ -227,7 +254,7 @@ impl TunnelServer {    /// Create new tunnel server
             None => {
                 return (StatusCode::NOT_FOUND, "Tunnel not found for this domain").into_response();
             }
-        };// Get the tunnel connection
+        }; // Get the tunnel connection
         let tunnel = {
             let tunnels = state.active_tunnels.read().await;
             match tunnels.get(&tunnel_id) {
@@ -265,9 +292,17 @@ impl TunnelServer {    /// Create new tunnel server
         let request_message = TunnelMessage::HttpRequest {
             id: request_id.clone(),
             method: method.as_str().to_string(),
-            path: uri.path_and_query().map(|pq| pq.as_str()).unwrap_or(uri.path()).to_string(),
+            path: uri
+                .path_and_query()
+                .map(|pq| pq.as_str())
+                .unwrap_or(uri.path())
+                .to_string(),
             headers: Self::headers_to_hashmap(&headers),
-            body: if body.is_empty() { None } else { Some(body.to_vec()) },
+            body: if body.is_empty() {
+                None
+            } else {
+                Some(body.to_vec())
+            },
             client_ip: "0.0.0.0".to_string(), // TODO: Extract real client IP
         };
 
@@ -277,60 +312,77 @@ impl TunnelServer {    /// Create new tunnel server
             // Clean up pending request
             state.pending_requests.write().await.remove(&request_id);
             return (StatusCode::BAD_GATEWAY, "Tunnel communication error").into_response();
-        }        // Wait for response with timeout
+        } // Wait for response with timeout
         let response_timeout = Duration::from_secs(30);
         let tunnel_id_for_rate_limit = tunnel_id.clone();
         let state_for_rate_limit = state.clone();
-        
+
         match tokio::time::timeout(response_timeout, response_receiver).await {
             Ok(Ok(tunnel_response)) => {
                 // Calculate bytes transferred for rate limiting
                 let bytes_transferred = match &tunnel_response {
                     TunnelMessage::HttpResponse { body, .. } => {
-                        body.as_ref().map(|b| b.len() as u64).unwrap_or(0)
+                        body.as_ref()
+                            .map(|b| b.len() as u64)
+                            .unwrap_or(0)
                     }
                     _ => 0,
                 };
-                
+
                 // Update rate limiting counters
-                Self::update_rate_limit_completion(&tunnel_id_for_rate_limit, &state_for_rate_limit, bytes_transferred).await;
-                
+                Self::update_rate_limit_completion(
+                    &tunnel_id_for_rate_limit,
+                    &state_for_rate_limit,
+                    bytes_transferred
+                ).await;
+
                 // Convert tunnel response to HTTP response
                 Self::tunnel_response_to_http(tunnel_response)
             }
             Ok(Err(_)) => {
                 // Channel closed - still update rate limiting
-                Self::update_rate_limit_completion(&tunnel_id_for_rate_limit, &state_for_rate_limit, 0).await;
+                Self::update_rate_limit_completion(
+                    &tunnel_id_for_rate_limit,
+                    &state_for_rate_limit,
+                    0
+                ).await;
                 (StatusCode::BAD_GATEWAY, "Tunnel closed during request").into_response()
             }
             Err(_) => {
                 // Timeout - still update rate limiting
-                Self::update_rate_limit_completion(&tunnel_id_for_rate_limit, &state_for_rate_limit, 0).await;
+                Self::update_rate_limit_completion(
+                    &tunnel_id_for_rate_limit,
+                    &state_for_rate_limit,
+                    0
+                ).await;
                 state.pending_requests.write().await.remove(&request_id);
                 (StatusCode::GATEWAY_TIMEOUT, "Request timeout").into_response()
             }
         }
-    }    /// Handle tunnel WebSocket connection establishment
+    }
+    /// Handle tunnel WebSocket connection establishment
     async fn handle_tunnel_connection(
         ws: WebSocketUpgrade,
         State(state): State<Arc<TunnelServerState>>,
-        ConnectInfo(addr): ConnectInfo<SocketAddr>,
+        ConnectInfo(addr): ConnectInfo<SocketAddr>
     ) -> Response {
         info!("New tunnel connection attempt from {}", addr);
         ws.on_upgrade(move |socket| Self::handle_tunnel_websocket(socket, state, addr.to_string()))
-    }    /// Handle tunnel WebSocket communication
+    }
+    /// Handle tunnel WebSocket communication
     async fn handle_tunnel_websocket(
         socket: axum::extract::ws::WebSocket,
         state: Arc<TunnelServerState>,
-        client_ip: String,
-    ) {        let (sender, mut receiver) = socket.split();
+        client_ip: String
+    ) {
+        let (sender, mut receiver) = socket.split();
         let tunnel_id = Uuid::new_v4().to_string();
-        
+
         info!("New tunnel connection: {} from {}", tunnel_id, client_ip);
 
         // Create channel for sending requests to this tunnel
         let (request_sender, mut request_receiver) = mpsc::channel::<TunnelMessage>(100);
-        
+
         // Store request sender for authentication phase
         let request_sender_for_auth = request_sender.clone();
 
@@ -338,20 +390,24 @@ impl TunnelServer {    /// Create new tunnel server
         let state_clone = state.clone();
         let tunnel_id_clone = tunnel_id.clone();
         let sender_handle = Arc::new(tokio::sync::Mutex::new(sender));
-        
+
         // Handle incoming WebSocket messages
         let sender_for_incoming = sender_handle.clone();
         let incoming_task = tokio::spawn(async move {
             while let Some(msg) = receiver.next().await {
                 match msg {
                     Ok(axum::extract::ws::Message::Text(text)) => {
-                        if let Ok(tunnel_msg) = TunnelProtocol::deserialize_message(text.as_bytes()) {
+                        if
+                            let Ok(tunnel_msg) = TunnelProtocol::deserialize_message(
+                                text.as_bytes()
+                            )
+                        {
                             Self::handle_tunnel_message(
                                 tunnel_msg,
                                 &tunnel_id_clone,
                                 &state_clone,
                                 &sender_for_incoming,
-                                &request_sender_for_auth,
+                                &request_sender_for_auth
                             ).await;
                         }
                     }
@@ -362,7 +418,7 @@ impl TunnelServer {    /// Create new tunnel server
                                 &tunnel_id_clone,
                                 &state_clone,
                                 &sender_for_incoming,
-                                &request_sender_for_auth,
+                                &request_sender_for_auth
                             ).await;
                         }
                     }
@@ -380,14 +436,18 @@ impl TunnelServer {    /// Create new tunnel server
 
             // Clean up tunnel on disconnect
             Self::cleanup_tunnel(&tunnel_id_clone, &state_clone).await;
-        });        // Handle outgoing requests to tunnel client
+        }); // Handle outgoing requests to tunnel client
         let sender_for_outgoing = sender_handle.clone();
         let outgoing_task = tokio::spawn(async move {
             while let Some(request_msg) = request_receiver.recv().await {
                 match serde_json::to_string(&request_msg) {
                     Ok(text) => {
                         let mut sender_guard = sender_for_outgoing.lock().await;
-                        if let Err(e) = sender_guard.send(axum::extract::ws::Message::Text(text)).await {
+                        if
+                            let Err(e) = sender_guard.send(
+                                axum::extract::ws::Message::Text(text)
+                            ).await
+                        {
                             error!("Failed to send request to tunnel: {}", e);
                             break;
                         }
@@ -405,17 +465,33 @@ impl TunnelServer {    /// Create new tunnel server
             _ = incoming_task => {},
             _ = outgoing_task => {},
         }
-    }    /// Handle individual tunnel protocol messages
+    }
+    /// Handle individual tunnel protocol messages
     async fn handle_tunnel_message(
         message: TunnelMessage,
         tunnel_id: &str,
         state: &Arc<TunnelServerState>,
-        sender: &Arc<tokio::sync::Mutex<futures_util::stream::SplitSink<axum::extract::ws::WebSocket, axum::extract::ws::Message>>>,
-        request_sender: &mpsc::Sender<TunnelMessage>,
+        sender: &Arc<
+            tokio::sync::Mutex<
+                futures_util::stream::SplitSink<
+                    axum::extract::ws::WebSocket,
+                    axum::extract::ws::Message
+                >
+            >
+        >,
+        request_sender: &mpsc::Sender<TunnelMessage>
     ) {
         match message {
             TunnelMessage::Auth { token, subdomain, protocol_version } => {
-                Self::handle_auth_message(tunnel_id, token, subdomain, protocol_version, state, sender, request_sender.clone()).await;
+                Self::handle_auth_message(
+                    tunnel_id,
+                    token,
+                    subdomain,
+                    protocol_version,
+                    state,
+                    sender,
+                    request_sender.clone()
+                ).await;
             }
             TunnelMessage::HttpResponse { id, status, headers, body } => {
                 Self::handle_http_response(id, status, headers, body, state).await;
@@ -423,13 +499,15 @@ impl TunnelServer {    /// Create new tunnel server
             TunnelMessage::Ping { timestamp } => {
                 let pong = TunnelMessage::Pong { timestamp };
                 Self::send_tunnel_message(&pong, sender).await;
-            }            TunnelMessage::Pong { timestamp: _ } => {
+            }
+            TunnelMessage::Pong { timestamp: _ } => {
                 // Handle pong response - update tunnel health
                 debug!("Received pong from tunnel {}", tunnel_id);
-            }            TunnelMessage::SslData { id, data } => {
+            }
+            TunnelMessage::SslData { id, data } => {
                 // Handle SSL data forwarding
                 debug!("Received SSL data for connection {}: {} bytes", id, data.len());
-                
+
                 // Forward SSL data to the appropriate connection
                 let ssl_connections = state.active_ssl_connections.read().await;
                 if let Some(sender) = ssl_connections.get(&id) {
@@ -443,7 +521,7 @@ impl TunnelServer {    /// Create new tunnel server
             TunnelMessage::SslClose { id } => {
                 // Handle SSL connection close
                 debug!("SSL connection {} closed", id);
-                
+
                 // Close the appropriate SSL connection by dropping the sender
                 let mut ssl_connections = state.active_ssl_connections.write().await;
                 if ssl_connections.remove(&id).is_some() {
@@ -456,13 +534,14 @@ impl TunnelServer {    /// Create new tunnel server
                 debug!("Unhandled tunnel message type from {}", tunnel_id);
             }
         }
-    }    /// Handle HTTP response from tunnel client
+    }
+    /// Handle HTTP response from tunnel client
     async fn handle_http_response(
         request_id: String,
         status: u16,
         headers: HashMap<String, String>,
         body: Option<Vec<u8>>,
-        state: &Arc<TunnelServerState>,
+        state: &Arc<TunnelServerState>
     ) {
         debug!("Received HTTP response for request {}: status {}", request_id, status);
 
@@ -482,7 +561,10 @@ impl TunnelServer {    /// Create new tunnel server
 
             // Send response back to the waiting HTTP handler
             if let Err(_) = pending_request.response_sender.send(response_message) {
-                warn!("Failed to send response for request {}: receiver dropped", pending_request.id);
+                warn!(
+                    "Failed to send response for request {}: receiver dropped",
+                    pending_request.id
+                );
             }
         } else {
             warn!("Received response for unknown request ID: {}", request_id);
@@ -493,13 +575,14 @@ impl TunnelServer {    /// Create new tunnel server
     fn tunnel_response_to_http(tunnel_response: TunnelMessage) -> Response {
         match tunnel_response {
             TunnelMessage::HttpResponse { status, headers, body, .. } => {
-                let mut response_builder = axum::http::Response::builder()
-                    .status(status);                // Add headers
+                let mut response_builder = axum::http::Response::builder().status(status); // Add headers
                 for (name, value) in headers {
-                    if let (Ok(header_name), Ok(header_value)) = (
-                        axum::http::HeaderName::from_bytes(name.as_bytes()),
-                        axum::http::HeaderValue::from_str(&value)
-                    ) {
+                    if
+                        let (Ok(header_name), Ok(header_value)) = (
+                            axum::http::HeaderName::from_bytes(name.as_bytes()),
+                            axum::http::HeaderValue::from_str(&value),
+                        )
+                    {
                         response_builder = response_builder.header(header_name, header_value);
                     }
                 }
@@ -515,25 +598,26 @@ impl TunnelServer {    /// Create new tunnel server
                 response_builder
                     .body(axum::body::Body::from(response_body))
                     .unwrap_or_else(|_| {
-                        (StatusCode::INTERNAL_SERVER_ERROR, "Failed to build response").into_response()
+                        (
+                            StatusCode::INTERNAL_SERVER_ERROR,
+                            "Failed to build response",
+                        ).into_response()
                     })
             }
-            _ => {
-                (StatusCode::INTERNAL_SERVER_ERROR, "Invalid response type").into_response()
-            }
+            _ => { (StatusCode::INTERNAL_SERVER_ERROR, "Invalid response type").into_response() }
         }
     }
 
     /// Cleanup expired pending requests
     async fn cleanup_expired_requests(state: Arc<TunnelServerState>) {
         let mut interval = tokio::time::interval(Duration::from_secs(30));
-        
+
         loop {
             interval.tick().await;
-            
+
             let now = std::time::Instant::now();
             let mut expired_requests = Vec::new();
-            
+
             {
                 let pending = state.pending_requests.read().await;
                 for (id, request) in pending.iter() {
@@ -542,7 +626,7 @@ impl TunnelServer {    /// Create new tunnel server
                     }
                 }
             }
-            
+
             if !expired_requests.is_empty() {
                 let mut pending = state.pending_requests.write().await;
                 for id in expired_requests {
@@ -552,16 +636,26 @@ impl TunnelServer {    /// Create new tunnel server
                     }
                 }
             }
-        }    }    /// Handle tunnel authentication
+        }
+    }
+    /// Handle tunnel authentication
     async fn handle_auth_message(
         tunnel_id: &str,
         token: String,
         requested_subdomain: Option<String>,
         protocol_version: String,
         state: &Arc<TunnelServerState>,
-        sender: &Arc<tokio::sync::Mutex<futures_util::stream::SplitSink<axum::extract::ws::WebSocket, axum::extract::ws::Message>>>,
-        request_sender: mpsc::Sender<TunnelMessage>,
-    ) {        // Validate protocol version
+        sender: &Arc<
+            tokio::sync::Mutex<
+                futures_util::stream::SplitSink<
+                    axum::extract::ws::WebSocket,
+                    axum::extract::ws::Message
+                >
+            >
+        >,
+        request_sender: mpsc::Sender<TunnelMessage>
+    ) {
+        // Validate protocol version
         if !state.protocol.is_compatible_version(&protocol_version) {
             let error_msg = TunnelMessage::Error {
                 code: 400,
@@ -569,7 +663,7 @@ impl TunnelServer {    /// Create new tunnel server
             };
             Self::send_tunnel_message(&error_msg, sender).await;
             return;
-        }        // Validate authentication token
+        } // Validate authentication token
         if !Self::validate_auth_token(&token, &state.config) {
             let error_msg = TunnelMessage::Error {
                 code: 401,
@@ -577,29 +671,20 @@ impl TunnelServer {    /// Create new tunnel server
             };
             Self::send_tunnel_message(&error_msg, sender).await;
             return;
-        }
-
-        // Extract user information from token for subdomain assignment
+        } // Extract user information from token for logging purposes only
         let user_info = Self::extract_user_info(&token, &state.config);
-        
-        // If no subdomain was requested, try to create one based on user info
-        let preferred_subdomain = if requested_subdomain.is_none() {
-            if let Some(user) = &user_info {
-                // Create user-based subdomain (e.g., "user-abc123" -> "abc123")
-                Some(user.replace("user-", "").replace("_", "-"))
-            } else {
-                None
-            }
-        } else {
-            requested_subdomain
-        };
 
-        info!("Authenticating tunnel {} for user: {:?}", tunnel_id, user_info);        // Allocate subdomain using SubdomainManager
-        let subdomain = match state.subdomain_manager.allocate_subdomain(
-            tunnel_id,
-            preferred_subdomain,
-            Some("0.0.0.0".to_string()), // TODO: Extract real client IP
-        ).await {
+        // Use the requested subdomain as-is, don't derive from user info
+        let preferred_subdomain = requested_subdomain;
+
+        info!("Authenticating tunnel {} for user: {:?}", tunnel_id, user_info); // Allocate subdomain using SubdomainManager
+        let subdomain = match
+            state.subdomain_manager.allocate_subdomain(
+                tunnel_id,
+                preferred_subdomain,
+                Some("0.0.0.0".to_string()) // TODO: Extract real client IP
+            ).await
+        {
             Ok(subdomain) => subdomain,
             Err(e) => {
                 let error_msg = TunnelMessage::AuthResponse {
@@ -610,7 +695,7 @@ impl TunnelServer {    /// Create new tunnel server
                 Self::send_tunnel_message(&error_msg, sender).await;
                 return;
             }
-        };        // Create tunnel entry
+        }; // Create tunnel entry
         let tunnel = ActiveTunnel {
             id: tunnel_id.to_string(),
             subdomain: subdomain.clone(),
@@ -619,7 +704,7 @@ impl TunnelServer {    /// Create new tunnel server
             authenticated: true,
             connected_at: std::time::SystemTime::now(),
             request_sender,
-        };// Register tunnel
+        }; // Register tunnel
         {
             let mut tunnels = state.active_tunnels.write().await;
             tunnels.insert(tunnel_id.to_string(), tunnel);
@@ -633,11 +718,24 @@ impl TunnelServer {    /// Create new tunnel server
         };
         Self::send_tunnel_message(&auth_response, sender).await;
 
-        info!("Tunnel {} authenticated with subdomain: {} (user: {:?})", tunnel_id, subdomain, user_info);
-    }    /// Send message through tunnel WebSocket
+        info!(
+            "Tunnel {} authenticated with subdomain: {} (user: {:?})",
+            tunnel_id,
+            subdomain,
+            user_info
+        );
+    }
+    /// Send message through tunnel WebSocket
     async fn send_tunnel_message(
         message: &TunnelMessage,
-        sender: &Arc<tokio::sync::Mutex<futures_util::stream::SplitSink<axum::extract::ws::WebSocket, axum::extract::ws::Message>>>,
+        sender: &Arc<
+            tokio::sync::Mutex<
+                futures_util::stream::SplitSink<
+                    axum::extract::ws::WebSocket,
+                    axum::extract::ws::Message
+                >
+            >
+        >
     ) {
         match serde_json::to_string(message) {
             Ok(text) => {
@@ -653,11 +751,14 @@ impl TunnelServer {    /// Create new tunnel server
     }
 
     /// Clean up tunnel on disconnect
-    async fn cleanup_tunnel(tunnel_id: &str, state: &Arc<TunnelServerState>) {        let subdomain = {
+    async fn cleanup_tunnel(tunnel_id: &str, state: &Arc<TunnelServerState>) {
+        let subdomain = {
             let mut tunnels = state.active_tunnels.write().await;
             match tunnels.remove(tunnel_id) {
                 Some(tunnel) => tunnel.subdomain,
-                None => return,
+                None => {
+                    return;
+                }
             }
         };
 
@@ -672,7 +773,8 @@ impl TunnelServer {    /// Create new tunnel server
     /// Handle health check endpoint
     async fn handle_health_check(State(state): State<Arc<TunnelServerState>>) -> Response {
         let tunnel_count = state.active_tunnels.read().await.len();
-        let response = serde_json::json!({
+        let response =
+            serde_json::json!({
             "status": "healthy",
             "active_tunnels": tunnel_count,
             "server_config": {
@@ -699,14 +801,10 @@ impl TunnelServer {    /// Create new tunnel server
     fn headers_to_hashmap(headers: &HeaderMap) -> HashMap<String, String> {
         headers
             .iter()
-            .map(|(name, value)| {
-                (
-                    name.to_string(),
-                    value.to_str().unwrap_or("").to_string(),
-                )
-            })
+            .map(|(name, value)| { (name.to_string(), value.to_str().unwrap_or("").to_string()) })
             .collect()
-    }    /// Validate authentication token (API key or JWT)
+    }
+    /// Validate authentication token (API key or JWT)
     fn validate_auth_token(token: &str, config: &TunnelServerConfig) -> bool {
         if !config.auth.required {
             return true;
@@ -727,7 +825,8 @@ impl TunnelServer {    /// Create new tunnel server
         }
 
         false
-    }    /// Simple JWT token validation
+    }
+    /// Simple JWT token validation
     fn validate_jwt_token(token: &str, _secret: &str) -> bool {
         // For simplicity, just check if token starts with expected format and decode basic claims
         if !token.starts_with("eyJ") {
@@ -738,18 +837,19 @@ impl TunnelServer {    /// Create new tunnel server
         let parts: Vec<&str> = token.split('.').collect();
         if parts.len() != 3 {
             return false;
-        }        // Try to decode payload (basic validation)
+        } // Try to decode payload (basic validation)
         if let Ok(payload_bytes) = general_purpose::URL_SAFE_NO_PAD.decode(parts[1]) {
             if let Ok(payload_str) = std::str::from_utf8(&payload_bytes) {
                 if let Ok(claims) = serde_json::from_str::<serde_json::Value>(payload_str) {
                     // Check basic JWT structure and expiration if present
                     if claims.is_object() {
                         if let Some(exp) = claims.get("exp").and_then(|e| e.as_i64()) {
-                            let now = std::time::SystemTime::now()
+                            let now = std::time::SystemTime
+                                ::now()
                                 .duration_since(std::time::UNIX_EPOCH)
                                 .unwrap_or_default()
                                 .as_secs() as i64;
-                            
+
                             return now < exp;
                         }
                         return true; // No expiration, consider valid
@@ -793,28 +893,32 @@ impl TunnelServer {    /// Create new tunnel server
         }
 
         None
-    }/// Check rate limiting for a tunnel
-    async fn check_rate_limit(tunnel_id: &str, state: &Arc<TunnelServerState>) -> Result<(), String> {
+    }
+    /// Check rate limiting for a tunnel
+    async fn check_rate_limit(
+        tunnel_id: &str,
+        state: &Arc<TunnelServerState>
+    ) -> Result<(), String> {
         let config = &state.config.rate_limiting;
         let now = std::time::Instant::now();
-        
+
         let mut rate_limiter = state.rate_limiter.lock().unwrap();
-        
+
         // Check request rate limit
         let should_reset_window;
         let current_count;
         let current_connections;
-        
+
         {
             let (count, window_start) = rate_limiter.request_counts
                 .entry(tunnel_id.to_string())
                 .or_insert((0, now));
-                
+
             // Check if window should be reset
             should_reset_window = now.duration_since(*window_start) > Duration::from_secs(60);
             current_count = *count;
         }
-        
+
         // Reset window if needed
         if should_reset_window {
             if let Some((count, window_start)) = rate_limiter.request_counts.get_mut(tunnel_id) {
@@ -822,58 +926,61 @@ impl TunnelServer {    /// Create new tunnel server
                 *window_start = now;
             }
         }
-        
+
         // Check rate limit
         if current_count >= config.requests_per_minute && !should_reset_window {
             return Err("Request rate limit exceeded".to_string());
         }
-        
+
         // Check concurrent connections
-        current_connections = rate_limiter.active_connections
-            .get(tunnel_id)
-            .copied()
-            .unwrap_or(0);
-            
+        current_connections = rate_limiter.active_connections.get(tunnel_id).copied().unwrap_or(0);
+
         if current_connections >= config.max_concurrent_connections {
             return Err("Concurrent connection limit exceeded".to_string());
         }
-        
+
         // Increment counters
         if let Some((count, _)) = rate_limiter.request_counts.get_mut(tunnel_id) {
             *count += 1;
         }
-        
+
         rate_limiter.active_connections
             .entry(tunnel_id.to_string())
-            .and_modify(|c| *c += 1)
+            .and_modify(|c| {
+                *c += 1;
+            })
             .or_insert(1);
 
         Ok(())
     }
 
     /// Update rate limiting counters after request completion
-    async fn update_rate_limit_completion(tunnel_id: &str, state: &Arc<TunnelServerState>, bytes_transferred: u64) {
+    async fn update_rate_limit_completion(
+        tunnel_id: &str,
+        state: &Arc<TunnelServerState>,
+        bytes_transferred: u64
+    ) {
         let mut rate_limiter = state.rate_limiter.lock().unwrap();
-        
+
         // Decrement active connections
         if let Some(count) = rate_limiter.active_connections.get_mut(tunnel_id) {
             if *count > 0 {
                 *count -= 1;
             }
         }
-        
+
         // Update bandwidth usage
         let now = std::time::Instant::now();
         let (bytes, window_start) = rate_limiter.bandwidth_usage
             .entry(tunnel_id.to_string())
             .or_insert((0, now));
-            
+
         // Reset window if it's been more than a second
         if now.duration_since(*window_start) > Duration::from_secs(1) {
             *bytes = 0;
             *window_start = now;
         }
-        
+
         *bytes += bytes_transferred;
     }
 
@@ -885,15 +992,17 @@ impl TunnelServer {    /// Create new tunnel server
         }
 
         let ssl_addr = SocketAddr::new(
-            self.config.network.public_bind_address.parse()
+            self.config.network.public_bind_address
+                .parse()
                 .map_err(|e| TunnelError::ConfigError(format!("Invalid SSL bind address: {}", e)))?,
             443 // Standard HTTPS port
         );
 
         info!("Starting SSL passthrough on {}", ssl_addr);
 
-        let listener = TcpListener::bind(ssl_addr).await
-            .map_err(|e| TunnelError::NetworkError(format!("Failed to bind SSL address: {}", e)))?;
+        let listener = TcpListener::bind(ssl_addr).await.map_err(|e|
+            TunnelError::NetworkError(format!("Failed to bind SSL address: {}", e))
+        )?;
 
         let state = self.state.clone();
         tokio::spawn(async move {
@@ -902,7 +1011,13 @@ impl TunnelServer {    /// Create new tunnel server
                     Ok((stream, addr)) => {
                         let state_clone = state.clone();
                         tokio::spawn(async move {
-                            if let Err(e) = Self::handle_ssl_connection(stream, addr, state_clone).await {
+                            if
+                                let Err(e) = Self::handle_ssl_connection(
+                                    stream,
+                                    addr,
+                                    state_clone
+                                ).await
+                            {
                                 error!("SSL connection error from {}: {}", addr, e);
                             }
                         });
@@ -915,37 +1030,48 @@ impl TunnelServer {    /// Create new tunnel server
         });
 
         Ok(())
-    }    /// Handle SSL/TLS connections for passthrough
+    }
+    /// Handle SSL/TLS connections for passthrough
     async fn handle_ssl_connection(
         mut stream: TcpStream,
         _client_addr: SocketAddr,
-        state: Arc<TunnelServerState>,
+        state: Arc<TunnelServerState>
     ) -> ServerResult<()> {
         // Read the initial bytes to detect TLS handshake and extract SNI
         let mut buffer = [0u8; 1024];
-        let bytes_read = stream.read(&mut buffer).await
-            .map_err(|e| TunnelError::NetworkError(format!("Failed to read TLS handshake: {}", e)))?;
+        let bytes_read = stream
+            .read(&mut buffer).await
+            .map_err(|e|
+                TunnelError::NetworkError(format!("Failed to read TLS handshake: {}", e))
+            )?;
 
         if bytes_read == 0 {
             return Err(TunnelError::NetworkError("Empty TLS handshake".to_string()));
         }
 
         // Extract SNI (Server Name Indication) from TLS handshake
-        let hostname = Self::extract_sni_from_tls(&buffer[..bytes_read])
-            .ok_or_else(|| TunnelError::ValidationError("Could not extract SNI from TLS handshake".to_string()))?;
+        let hostname = Self::extract_sni_from_tls(&buffer[..bytes_read]).ok_or_else(||
+            TunnelError::ValidationError("Could not extract SNI from TLS handshake".to_string())
+        )?;
 
         // Extract subdomain from hostname
-        let subdomain = Self::extract_subdomain(&hostname, &state.config.base_domain)
-            .ok_or_else(|| TunnelError::ValidationError("Invalid subdomain in SNI".to_string()))?;
+        let subdomain = Self::extract_subdomain(&hostname, &state.config.base_domain).ok_or_else(||
+            TunnelError::ValidationError("Invalid subdomain in SNI".to_string())
+        )?;
 
         // Find the tunnel for this subdomain
-        let tunnel_id = state.subdomain_manager.get_tunnel_for_subdomain(&subdomain).await
-            .ok_or_else(|| TunnelError::ValidationError("No tunnel found for subdomain".to_string()))?;
+        let tunnel_id = state.subdomain_manager
+            .get_tunnel_for_subdomain(&subdomain).await
+            .ok_or_else(||
+                TunnelError::ValidationError("No tunnel found for subdomain".to_string())
+            )?;
 
         // Get the tunnel connection
         let tunnel = {
             let tunnels = state.active_tunnels.read().await;
-            tunnels.get(&tunnel_id).cloned()
+            tunnels
+                .get(&tunnel_id)
+                .cloned()
                 .ok_or_else(|| TunnelError::ValidationError("Tunnel disconnected".to_string()))?
         };
 
@@ -957,7 +1083,7 @@ impl TunnelServer {    /// Create new tunnel server
     fn extract_sni_from_tls(data: &[u8]) -> Option<String> {
         // TLS handshake parsing to extract SNI
         // This is a simplified version - in production, you'd want a more robust parser
-        
+
         if data.len() < 43 {
             return None;
         }
@@ -979,7 +1105,7 @@ impl TunnelServer {    /// Create new tunnel server
         if offset >= data.len() {
             return None;
         }
-        offset += data[offset] as usize + 1;
+        offset += (data[offset] as usize) + 1;
 
         // Skip cipher suites
         if offset + 1 >= data.len() {
@@ -992,7 +1118,7 @@ impl TunnelServer {    /// Create new tunnel server
         if offset >= data.len() {
             return None;
         }
-        offset += data[offset] as usize + 1;
+        offset += (data[offset] as usize) + 1;
 
         // Check for extensions
         if offset + 1 >= data.len() {
@@ -1042,12 +1168,13 @@ impl TunnelServer {    /// Create new tunnel server
         } else {
             None
         }
-    }    /// Forward SSL traffic through tunnel WebSocket
+    }
+    /// Forward SSL traffic through tunnel WebSocket
     async fn forward_ssl_through_tunnel(
         client_stream: TcpStream,
         initial_data: Vec<u8>,
         tunnel: ActiveTunnel,
-        state: Arc<TunnelServerState>,
+        state: Arc<TunnelServerState>
     ) -> ServerResult<()> {
         // Generate unique connection ID for this SSL session
         let connection_id = Uuid::new_v4().to_string();
@@ -1068,7 +1195,7 @@ impl TunnelServer {    /// Create new tunnel server
         // Create channels for bidirectional SSL data forwarding
         let (ssl_tx, mut ssl_rx) = mpsc::channel::<Vec<u8>>(100);
         let connection_id_for_state = connection_id.clone();
-        
+
         // Store SSL connection for receiving data from tunnel client
         {
             let mut ssl_connections = state.active_ssl_connections.write().await;
@@ -1096,7 +1223,7 @@ impl TunnelServer {    /// Create new tunnel server
                             id: connection_id_read.clone(),
                             data,
                         };
-                        
+
                         if let Err(e) = tunnel_sender.send(ssl_data_msg).await {
                             error!("Failed to forward SSL data to tunnel: {}", e);
                             break;
@@ -1108,7 +1235,7 @@ impl TunnelServer {    /// Create new tunnel server
                     }
                 }
             }
-            
+
             // Send SSL close message
             let ssl_close_msg = TunnelMessage::SslClose {
                 id: connection_id_read,
@@ -1147,20 +1274,20 @@ impl TunnelServer {    /// Create new tunnel server
     /// Middleware to add HTTP-only headers and prevent HTTPS redirects
     async fn add_http_headers(
         request: axum::extract::Request,
-        next: axum::middleware::Next,
+        next: axum::middleware::Next
     ) -> Response {
         let mut response = next.run(request).await;
-        
+
         // Add headers to prevent HTTPS redirects and ensure HTTP-only operation
         let headers = response.headers_mut();
         headers.insert("X-Frame-Options", "SAMEORIGIN".parse().unwrap());
         headers.insert("X-Content-Type-Options", "nosniff".parse().unwrap());
         headers.insert("Referrer-Policy", "strict-origin-when-cross-origin".parse().unwrap());
         headers.insert("X-Forwarded-Proto", "http".parse().unwrap());
-        
+
         // Explicitly remove any HSTS headers that might be added elsewhere
         headers.remove("Strict-Transport-Security");
-        
+
         response
     }
 }
