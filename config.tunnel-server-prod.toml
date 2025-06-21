@@ -1,0 +1,107 @@
+# Production Tunnel Server Configuration
+# This runs on the Digital Ocean droplet
+
+[logging]
+level = "info"
+file_logging = true
+logs_directory = "./logs"
+format = "text"
+output_mode = "both"
+
+[application]
+name = "httpserver-tunnel-server"
+environment = "production"
+
+[server]
+# Use a different port for the main server when tunnel server handles public traffic
+default_port = 8080
+request_timeout = 30
+max_request_size_mb = 10
+enable_health_endpoints = true
+
+# DISABLE SSL for this example
+[server.ssl]
+enabled = false
+
+[static_config]
+directory = "./website"
+fallback = "index.html"
+
+# TUNNEL SERVER CONFIGURATION
+[tunnel]
+enabled = true
+
+# This server acts as tunnel server
+[tunnel.server]
+# Enable tunnel server functionality
+enabled = true
+
+# Port for tunnel WebSocket connections (where clients connect)
+tunnel_port = 8081
+
+# Base domain for tunnel subdomains (replace with your domain)
+base_domain = "yourdomain.com"
+
+# Public HTTP port (where public traffic is served)
+public_port = 80
+
+# Public HTTPS port (disabled for this example)
+public_https_port = 443
+
+# Maximum number of concurrent tunnels
+max_tunnels = 100
+
+# How subdomains are allocated
+subdomain_strategy = "Random"
+
+# Length of random subdomains
+subdomain_length = 8
+
+# Reserved subdomains that cannot be allocated
+reserved_subdomains = ["www", "api", "admin", "mail", "ftp", "app", "secure"]
+
+# Authentication for tunnel connections
+[tunnel.server.auth]
+required = true
+api_keys = ["your-secret-api-key-here", "backup-key-123"]
+
+# Rate limiting to prevent abuse
+[tunnel.server.rate_limit]
+enabled = true
+requests_per_minute = 1000
+max_connections_per_tunnel = 50
+max_bandwidth_per_tunnel = 10485760  # 10 MB/s
+
+# DISABLE SSL for tunnel server
+[tunnel.server.ssl]
+enabled = false
+
+# Monitoring and health checks
+[tunnel.server.monitoring]
+enabled = true
+health_endpoint = "/health"
+collect_metrics = true
+metrics_endpoint = "/metrics"
+log_tunnel_events = true
+
+# Performance settings
+[tunnel.server.performance]
+connection_pool_size = 1000
+worker_threads = 0  # Auto-detect
+websocket_buffer_size = 65536
+cleanup_interval = 300
+
+# Security settings
+[tunnel.server.security]
+cors_enabled = true
+cors_origins = []  # Allow all origins
+validate_host_headers = true
+max_request_size = 104857600  # 100 MB
+connection_timeout = 60
+idle_timeout = 300
+
+# Network configuration
+[tunnel.server.network]
+bind_address = "0.0.0.0"
+public_bind_address = "0.0.0.0"
+tcp_keepalive = true

@@ -148,28 +148,39 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Server::new(port)
     };
 
-    // Start main server and tunnel server concurrently
+    // Start tunnel server and main server (on different ports if needed)
     if let Some(tunnel_handle) = tunnel_server {
-        tracing::info!("Starting main HTTP server and tunnel server concurrently");
-        
-        let main_server_future = server.start(app);
-        
-        // Wait for either server to complete (or error)
-        tokio::select! {
-            result = main_server_future => {
-                tracing::info!("Main server completed");
-                result?;
+        // If tunnel server public_port conflicts with main server port, run only tunnel server
+        if config.tunnel.server.public_port == port {
+            tracing::info!("Tunnel server handles public traffic on port {} - skipping main HTTP server", port);
+            
+            // Wait for tunnel server to complete
+            if let Err(e) = tunnel_handle.await {
+                tracing::error!("Tunnel server task error: {}", e);
+                return Err(e.into());
             }
-            result = tunnel_handle => {
-                tracing::info!("Tunnel server completed");
-                if let Err(e) = result {
-                    tracing::error!("Tunnel server task error: {}", e);
-                    return Err(e.into());
+        } else {
+            tracing::info!("Starting main HTTP server and tunnel server on different ports");
+            
+            let main_server_future = server.start(app);
+            
+            // Wait for either server to complete (or error)
+            tokio::select! {
+                result = main_server_future => {
+                    tracing::info!("Main server completed");
+                    result?;
+                }
+                result = tunnel_handle => {
+                    tracing::info!("Tunnel server completed");
+                    if let Err(e) = result {
+                        tracing::error!("Tunnel server task error: {}", e);
+                        return Err(e.into());
+                    }
                 }
             }
         }
     } else {
-        // No tunnel server, just start main server
+        // No tunnel server, start main server
         tracing::info!("Starting main HTTP server only");
         server.start(app).await?;
     }
