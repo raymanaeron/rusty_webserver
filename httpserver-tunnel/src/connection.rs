@@ -193,7 +193,7 @@ impl TunnelConnection {
     }
 
     /// Attempt single connection
-    async fn connect_once(&mut self, local_port: u16) -> TunnelResult<()> {
+    async fn connect_once(&mut self, _local_port: u16) -> TunnelResult<()> {
         self.connection_start = Some(Instant::now());
         
         // Parse WebSocket URL
@@ -235,15 +235,7 @@ impl TunnelConnection {
         if !auth_success {
             return Err(TunnelError::AuthenticationFailed("Server rejected authentication".to_string()));
         }
-        
-        self.set_state(ConnectionState::Authenticated).await;
-        
-        // Request tunnel setup
-        let tunnel_established = self.establish_tunnel(&mut ws_sender, &mut ws_receiver, local_port).await?;
-        
-        if !tunnel_established {
-            return Err(TunnelError::ProtocolError("Failed to establish tunnel".to_string()));
-        }        
+          self.set_state(ConnectionState::Authenticated).await;
         let public_url = self.get_public_url().await.unwrap_or_default();
         tracing::info!(
             public_url = %public_url,
@@ -416,20 +408,7 @@ impl TunnelConnection {
                 Err(TunnelError::ConnectionFailed("Authentication timeout".to_string()))
             }
         }
-    }
-
-    /// Establish tunnel with server
-    async fn establish_tunnel(
-        &self,
-        ws_sender: &mut futures_util::stream::SplitSink<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>, Message>,
-        ws_receiver: &mut futures_util::stream::SplitStream<tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>>,
-        local_port: u16,    ) -> TunnelResult<bool> {
-        // After successful authentication, the tunnel is established
-        // No separate tunnel request needed - server assigns subdomain during auth
-        Ok(true)
-    }
-
-    /// Handle incoming WebSocket message
+    }    /// Handle incoming WebSocket message
     async fn handle_websocket_message(&self, message: Message) -> TunnelResult<()> {
         match message {
             Message::Text(text) => {
