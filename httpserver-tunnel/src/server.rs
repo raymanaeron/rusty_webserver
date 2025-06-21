@@ -15,6 +15,7 @@ use uuid::Uuid;
 use axum::{
     extract::{State, WebSocketUpgrade, ConnectInfo},
     http::{HeaderMap, Method, StatusCode, Uri},
+    middleware,
     response::{IntoResponse, Response},
     routing::{any, get},
     Router,
@@ -184,6 +185,8 @@ impl TunnelServer {    /// Create new tunnel server
             .layer(
                 ServiceBuilder::new()
                     .layer(CorsLayer::permissive())
+                    // Add middleware to ensure HTTP-only responses
+                    .layer(axum::middleware::from_fn(Self::add_http_headers))
                     .into_inner(),
             )
             .with_state(self.state.clone())
@@ -491,9 +494,7 @@ impl TunnelServer {    /// Create new tunnel server
         match tunnel_response {
             TunnelMessage::HttpResponse { status, headers, body, .. } => {
                 let mut response_builder = axum::http::Response::builder()
-                    .status(status);
-
-                // Add headers
+                    .status(status);                // Add headers
                 for (name, value) in headers {
                     if let (Ok(header_name), Ok(header_value)) = (
                         axum::http::HeaderName::from_bytes(name.as_bytes()),
@@ -502,6 +503,12 @@ impl TunnelServer {    /// Create new tunnel server
                         response_builder = response_builder.header(header_name, header_value);
                     }
                 }
+
+                // Add explicit HTTP-only headers to prevent HTTPS redirects
+                response_builder = response_builder
+                    .header("X-Frame-Options", "SAMEORIGIN")
+                    .header("X-Content-Type-Options", "nosniff")
+                    .header("Referrer-Policy", "strict-origin-when-cross-origin");
 
                 // Add body
                 let response_body = body.unwrap_or_default();
@@ -1135,5 +1142,25 @@ impl TunnelServer {    /// Create new tunnel server
 
         info!("SSL connection {} forwarding completed", connection_id);
         Ok(())
+    }
+
+    /// Middleware to add HTTP-only headers and prevent HTTPS redirects
+    async fn add_http_headers(
+        request: axum::extract::Request,
+        next: axum::middleware::Next,
+    ) -> Response {
+        let mut response = next.run(request).await;
+        
+        // Add headers to prevent HTTPS redirects and ensure HTTP-only operation
+        let headers = response.headers_mut();
+        headers.insert("X-Frame-Options", "SAMEORIGIN".parse().unwrap());
+        headers.insert("X-Content-Type-Options", "nosniff".parse().unwrap());
+        headers.insert("Referrer-Policy", "strict-origin-when-cross-origin".parse().unwrap());
+        headers.insert("X-Forwarded-Proto", "http".parse().unwrap());
+        
+        // Explicitly remove any HSTS headers that might be added elsewhere
+        headers.remove("Strict-Transport-Security");
+        
+        response
     }
 }
