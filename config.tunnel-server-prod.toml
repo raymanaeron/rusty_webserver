@@ -39,8 +39,8 @@ enabled = true
 # Port for tunnel WebSocket connections (where clients connect)
 tunnel_port = 8081
 
-# Base domain for tunnel subdomains (replace with your domain)
-base_domain = "httpserver.io"
+# Base domain for tunnel subdomains (using IP for testing)
+base_domain = "143.198.102.196.nip.io"
 
 # Public HTTP port (where public traffic is served)
 public_port = 80
