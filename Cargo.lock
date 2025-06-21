@@ -901,6 +901,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "httpserver-tests"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "axum-tungstenite",
+ "base64 0.21.7",
+ "chrono",
+ "futures-util",
+ "httpserver-balancer",
+ "httpserver-config",
+ "httpserver-core",
+ "httpserver-proxy",
+ "httpserver-static",
+ "httpserver-tunnel",
+ "rcgen",
+ "reqwest",
+ "serde_json",
+ "tempfile",
+ "tokio",
+ "tokio-tungstenite 0.20.1",
+ "tokio-util",
+ "tower 0.4.13",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "tungstenite 0.20.1",
+ "uuid",
+]
+
+[[package]]
 name = "httpserver-tunnel"
 version = "0.1.0"
 dependencies = [
